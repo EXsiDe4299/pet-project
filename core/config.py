@@ -30,7 +30,7 @@ class DatabaseConfig(BaseModel):
     @property
     def url(self) -> PostgresDsn:
         return PostgresDsn(
-            url=f'postgresql+asyncpg://{self.host}:{self.port}@{self.user}:{self.password}/{self.database}',
+            url=f'postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}',
         )
 
 
