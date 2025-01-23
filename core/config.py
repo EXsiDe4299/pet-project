@@ -1,3 +1,6 @@
+import logging
+from typing import Literal
+
 from pydantic import BaseModel, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -5,6 +8,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class RunConfig(BaseModel):
     host: str = '0.0.0.0'
     port: int = 8000
+
+
+class LoggingConfig(BaseModel):
+    log_level: Literal[
+        'debug',
+        'info',
+        'warning',
+        'error',
+        'critical',
+    ] = 'debug'
+    log_format: str = '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s'
+    date_format: str = "%d/%b/%Y %H:%M:%S"
+
+    @property
+    def log_level_value(self):
+        return logging.getLevelNamesMapping()[self.log_level.upper()]
 
 
 class DatabaseConfig(BaseModel):
@@ -43,6 +62,7 @@ class Settings(BaseSettings):
     )
     run: RunConfig = RunConfig()
     db: DatabaseConfig
+    log: LoggingConfig = LoggingConfig()
 
 
 settings: Settings = Settings()
