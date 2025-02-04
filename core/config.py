@@ -1,29 +1,14 @@
 import logging
 from typing import Literal
+from pathlib import Path
 
 from pydantic import BaseModel, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class RunConfig(BaseModel):
-    host: str = '0.0.0.0'
+    host: str = "0.0.0.0"
     port: int = 8000
-
-
-class LoggingConfig(BaseModel):
-    log_level: Literal[
-        'debug',
-        'info',
-        'warning',
-        'error',
-        'critical',
-    ] = 'debug'
-    log_format: str = '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s'
-    date_format: str = "%d/%b/%Y %H:%M:%S"
-
-    @property
-    def log_level_value(self):
-        return logging.getLevelNamesMapping()[self.log_level.upper()]
 
 
 class DatabaseConfig(BaseModel):
@@ -42,7 +27,7 @@ class DatabaseConfig(BaseModel):
         "uq": "uq_%(table_name)s_%(column_0_name)s",
         "ck": "ck_%(table_name)s_%(constraint_name)s",
         "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-        "pk": "pk_%(table_name)s"
+        "pk": "pk_%(table_name)s",
     }
 
     @computed_field
@@ -51,18 +36,53 @@ class DatabaseConfig(BaseModel):
         return PostgresDsn(
             url=f'postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}',
         )
+            url=f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
+        )
+
+
+class LoggingConfig(BaseModel):
+    log_level: Literal[
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "critical",
+    ] = "debug"
+    log_format: str = (
+        "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+    )
+    date_format: str = "%d/%b/%Y %H:%M:%S"
+
+    @property
+    def log_level_value(self):
+        return logging.getLevelNamesMapping()[self.log_level.upper()]
+
+
+class JWTAuthConfig(BaseModel):
+    private_key_path: Path = (
+        Path(__file__).parent.parent / "certificates" / "private.pem"
+    )
+    public_key_path: Path = Path(__file__).parent.parent / "certificates" / "public.pem"
+    algorithm: str = "RS256"
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_minutes: int = 60 * 24 * 30
+    access_token_type: str = "access"
+    refresh_token_type: str = "refresh"
+    token_type_payload_key: str = "token_type"
+    token_header_prefix: str = "Bearer"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=('.env.template', '.env'),
+        env_file=(".env.template", ".env"),
         case_sensitive=False,
-        env_nested_delimiter='__',
-        env_prefix='APP_CONFIG__'
+        env_nested_delimiter="__",
+        env_prefix="APP_CONFIG__",
     )
     run: RunConfig = RunConfig()
     db: DatabaseConfig
     log: LoggingConfig = LoggingConfig()
+    jwt_auth: JWTAuthConfig = JWTAuthConfig()
 
 
 settings: Settings = Settings()
