@@ -1,18 +1,23 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    async_sessionmaker,
+    AsyncSession,
+    AsyncEngine,
+)
 
 from core.config import settings
 
 
 class DbHelper:
     def __init__(
-            self,
-            url,
-            echo,
-            echo_pool,
-            max_overflow,
-            pool_size,
+        self,
+        url,
+        echo,
+        echo_pool,
+        max_overflow,
+        pool_size,
     ):
         self.engine: AsyncEngine = create_async_engine(
             url=url,
