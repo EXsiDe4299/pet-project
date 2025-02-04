@@ -1,6 +1,6 @@
 import logging
-from typing import Literal
 from pathlib import Path
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,8 +34,6 @@ class DatabaseConfig(BaseModel):
     @property
     def url(self) -> PostgresDsn:
         return PostgresDsn(
-            url=f'postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}',
-        )
             url=f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
         )
 
@@ -72,6 +70,15 @@ class JWTAuthConfig(BaseModel):
     token_header_prefix: str = "Bearer"
 
 
+class CookieConfig(BaseModel):
+    refresh_token_key: str = "refresh_token"
+    path: str = "/"
+    domain: str | None = None
+    secure: bool = False
+    httponly: bool = True
+    samesite: Literal["lax", "strict", "none"] = "lax"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env.template", ".env"),
@@ -83,6 +90,7 @@ class Settings(BaseSettings):
     db: DatabaseConfig
     log: LoggingConfig = LoggingConfig()
     jwt_auth: JWTAuthConfig = JWTAuthConfig()
+    cookie: CookieConfig = CookieConfig()
 
 
 settings: Settings = Settings()
