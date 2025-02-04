@@ -2,8 +2,10 @@ import logging
 from pathlib import Path
 from typing import Literal, NamedTuple
 
+from fastapi import HTTPException
 from pydantic import BaseModel, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette import status
 
 
 class RunConfig(BaseModel):
@@ -70,6 +72,29 @@ class JWTAuthConfig(BaseModel):
     token_header_prefix: str = "Bearer"
 
 
+class ExceptionsConfig(NamedTuple):
+    already_registered_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="User already registered",
+    )
+    auth_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect login or password",
+    )
+    inactive_user_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Inactive user",
+    )
+    invalid_token_type_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid token type",
+    )
+    invalid_token_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid token",
+    )
+
+
 class CookieConfig(BaseModel):
     refresh_token_key: str = "refresh_token"
     path: str = "/"
@@ -90,6 +115,7 @@ class Settings(BaseSettings):
     db: DatabaseConfig
     log: LoggingConfig = LoggingConfig()
     jwt_auth: JWTAuthConfig = JWTAuthConfig()
+    exc: ExceptionsConfig = ExceptionsConfig()
     cookie: CookieConfig = CookieConfig()
 
 
