@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Cookie
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
@@ -13,17 +13,17 @@ from api.api_v1.schemas.auth_responses import (
 )
 from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
 from api.api_v1.utils.database import get_user_by_username, create_user
+from api.api_v1.dependencies.auth import get_current_user_from_refresh_token
 from api.api_v1.utils.jwt_auth import (
     create_access_token,
     create_refresh_token,
-    decode_jwt,
 )
 from api.api_v1.utils.security import (
     hash_password,
     verify_password,
-    validate_token_type,
 )
 from core.config import settings
+from core.models import User
 from core.models.db_helper import db_helper
 
 auth_router = APIRouter(tags=["Auth"])
@@ -115,26 +115,8 @@ async def login_endpoint(
 )
 async def refresh_jwt_endpoint(
     response: Response,
-    refresh_token: str = Cookie(),
-    session: AsyncSession = Depends(db_helper.get_session),
+    user: User = Depends(get_current_user_from_refresh_token),
 ):
-    token_payload = decode_jwt(token=refresh_token)
-    if not validate_token_type(
-        token_payload=token_payload, expected_type=settings.jwt_auth.refresh_token_type
-    ):
-        logger.warning("Refreshing failed: invalid token type")
-        raise settings.exc.invalid_token_type_exc
-
-    username = token_payload.get("sub")
-    user = await get_user_by_username(username=username, session=session)
-    if user is None:
-        logger.warning("Refreshing failed: invalid token")
-        raise settings.exc.invalid_token_exc
-
-    if not user.is_active:
-        logger.warning("Refreshing failed: inactive user")
-        raise settings.exc.inactive_user_exc
-
     new_access_token = create_access_token(user)
     new_refresh_token = create_refresh_token(user)
 
