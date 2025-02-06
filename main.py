@@ -31,7 +31,7 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(router=api_router, prefix="/api")
+app.include_router(router=api_router)
 
 
 @app.middleware("http")

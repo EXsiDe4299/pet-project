@@ -26,13 +26,16 @@ from core.config import settings
 from core.models import User
 from core.models.db_helper import db_helper
 
-auth_router = APIRouter(tags=["Auth"])
+auth_router = APIRouter(
+    prefix=settings.auth_router.prefix,
+    tags=settings.auth_router.tags,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @auth_router.post(
-    "/register",
+    settings.auth_router.registration_endpoint_prefix,
     status_code=status.HTTP_201_CREATED,
     response_model=RegistrationResponse,
 )
@@ -59,7 +62,7 @@ async def registration_endpoint(
 
 
 @auth_router.post(
-    "/login",
+    settings.auth_router.login_endpoint_prefix,
     status_code=status.HTTP_200_OK,
     response_model=LoginResponse,
 )
@@ -109,7 +112,7 @@ async def login_endpoint(
 
 
 @auth_router.post(
-    "/refresh",
+    settings.auth_router.refresh_endpoint_prefix,
     status_code=status.HTTP_200_OK,
     response_model=RefreshResponse,
 )
@@ -140,7 +143,7 @@ async def refresh_jwt_endpoint(
 
 
 @auth_router.get(
-    "/logout",
+    settings.auth_router.logout_endpoint_prefix,
     status_code=status.HTTP_200_OK,
     response_model=LogoutResponse,
 )

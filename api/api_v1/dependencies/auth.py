@@ -11,7 +11,14 @@ from core.config import settings
 from core.models import User
 from core.models.db_helper import db_helper
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=(
+        settings.main_router.prefix
+        + settings.v1_router.prefix
+        + settings.auth_router.prefix
+        + settings.auth_router.login_endpoint_prefix
+    )
+)
 
 logger = logging.getLogger(__name__)
 
