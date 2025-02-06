@@ -104,6 +104,23 @@ class CookieConfig(BaseModel):
     samesite: Literal["lax", "strict", "none"] = "lax"
 
 
+class MainRouterConfig(BaseModel):
+    prefix: str = "/api"
+
+
+class V1RouterConfig(BaseModel):
+    prefix: str = "/v1"
+
+
+class AuthRouterConfig(BaseModel):
+    prefix: str = "/auth"
+    tags: list[str] = ["Auth"]
+    registration_endpoint_prefix: str = "/register"
+    login_endpoint_prefix: str = "/login"
+    refresh_endpoint_prefix: str = "/refresh"
+    logout_endpoint_prefix: str = "/logout"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env.template", ".env"),
@@ -117,6 +134,9 @@ class Settings(BaseSettings):
     jwt_auth: JWTAuthConfig = JWTAuthConfig()
     exc: ExceptionsConfig = ExceptionsConfig()
     cookie: CookieConfig = CookieConfig()
+    main_router: MainRouterConfig = MainRouterConfig()
+    v1_router: V1RouterConfig = V1RouterConfig()
+    auth_router: AuthRouterConfig = AuthRouterConfig()
 
 
 settings: Settings = Settings()
