@@ -1,3 +1,6 @@
+import secrets
+import string
+
 import bcrypt
 
 from core.config import settings
@@ -18,3 +21,9 @@ def verify_password(password: str, correct_password: bytes) -> bool:
 def validate_token_type(token_payload: dict, expected_type: str) -> bool:
     token_type = token_payload.get(settings.jwt_auth.token_type_payload_key)
     return token_type == expected_type
+
+
+def generate_email_verification_token(length: int = 6) -> str:
+    symbols = string.ascii_lowercase + string.digits
+    email_verification_token = "".join(secrets.choice(symbols) for _ in range(length))
+    return email_verification_token
