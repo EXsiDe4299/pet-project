@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models import User
@@ -9,6 +9,17 @@ async def get_user_by_username(
     session: AsyncSession,
 ) -> User | None:
     stmt = select(User).where(User.username == username)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    return user
+
+
+async def get_user_by_username_or_email(
+    username: str,
+    email: str,
+    session: AsyncSession,
+) -> User | None:
+    stmt = select(User).where(or_(User.username == username, User.email == email))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
