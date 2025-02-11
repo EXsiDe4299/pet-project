@@ -77,6 +77,30 @@ async def registration_endpoint(
 
 
 @auth_router.post(
+    settings.auth_router.resend_email_token_prefix,
+    status_code=status.HTTP_200_OK,
+    response_model=ResendingEmailTokenResponse,
+)
+async def resend_email_verification_token_endpoint(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_user_for_resending_email_verification_token),
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+    email_verification_token = generate_email_verification_token()
+
+    user.email_verification_token = email_verification_token
+    await session.commit()
+
+    send_plain_message_to_email(
+        subject="Email Verification",
+        email_address=user.email,
+        body=email_verification_token,
+        background_tasks=background_tasks,
+    )
+    return ResendingEmailTokenResponse()
+
+
+@auth_router.post(
     settings.auth_router.login_endpoint_prefix,
     status_code=status.HTTP_200_OK,
     response_model=LoginResponse,
