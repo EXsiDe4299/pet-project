@@ -116,9 +116,13 @@ class AuthRouterConfig(BaseModel):
     prefix: str = "/auth"
     tags: list[str] = ["Auth"]
     registration_endpoint_prefix: str = "/register"
+    confirm_email_endpoint_prefix: str = "/confirm-email/{email_verification_token}"
     login_endpoint_prefix: str = "/login"
     refresh_endpoint_prefix: str = "/refresh"
     logout_endpoint_prefix: str = "/logout"
+    resend_email_token_prefix: str = "/resend-email-verification-token"
+
+
 class SmtpConfig(BaseModel):
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
