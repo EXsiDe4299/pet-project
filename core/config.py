@@ -119,6 +119,17 @@ class AuthRouterConfig(BaseModel):
     login_endpoint_prefix: str = "/login"
     refresh_endpoint_prefix: str = "/refresh"
     logout_endpoint_prefix: str = "/logout"
+class SmtpConfig(BaseModel):
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str
+    MAIL_PORT: int
+    MAIL_SERVER: str
+    MAIL_FROM_NAME: str
+    MAIL_STARTTLS: bool
+    MAIL_SSL_TLS: bool
+    USE_CREDENTIALS: bool
+    VALIDATE_CERTS: bool
 
 
 class Settings(BaseSettings):
@@ -137,6 +148,7 @@ class Settings(BaseSettings):
     main_router: MainRouterConfig = MainRouterConfig()
     v1_router: V1RouterConfig = V1RouterConfig()
     auth_router: AuthRouterConfig = AuthRouterConfig()
+    smtp: SmtpConfig
 
 
 settings: Settings = Settings()
