@@ -31,3 +31,12 @@ async def create_user(
     await session.commit()
     await session.refresh(new_user)
     return new_user
+
+
+async def confirm_user_email(
+    user: User,
+    session: AsyncSession,
+) -> None:
+    user.is_email_verified = True
+    user.email_verification_token = None
+    await session.commit()
