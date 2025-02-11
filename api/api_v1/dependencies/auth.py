@@ -4,9 +4,14 @@ from fastapi import Depends, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.api_v1.utils.database import get_user_by_username
+from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
+from api.api_v1.utils.database import (
+    get_user_by_username,
+    get_user_by_email_verification_token,
+    get_user_by_username_or_email,
+)
 from api.api_v1.utils.jwt_auth import decode_jwt
-from api.api_v1.utils.security import validate_token_type
+from api.api_v1.utils.security import validate_token_type, verify_password
 from core.config import settings
 from core.models import User
 from core.models.db_helper import db_helper
@@ -43,6 +48,9 @@ async def get_user_from_token(
     if not user.is_active:
         logger.warning("Refreshing failed: inactive user")
         raise settings.exc.inactive_user_exc
+    if not user.is_email_verified:
+        logger.warning("Refreshing failed: email not verified")
+        raise settings.exc.not_verified_email_exc
 
     return user
 
