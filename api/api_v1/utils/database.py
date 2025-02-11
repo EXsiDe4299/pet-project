@@ -14,6 +14,16 @@ async def get_user_by_username(
     return user
 
 
+async def get_user_by_email_verification_token(
+    email_verification_token: str,
+    session: AsyncSession,
+) -> User | None:
+    stmt = select(User).where(User.email_verification_token == email_verification_token)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    return user
+
+
 async def create_user(
     username: str,
     hashed_password: bytes,
