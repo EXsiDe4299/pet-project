@@ -93,6 +93,18 @@ class ExceptionsConfig(NamedTuple):
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid token",
     )
+    email_already_verified_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Email already verified",
+    )
+    invalid_verification_code_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid verification code",
+    )
+    not_verified_email_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Email is not verified",
+    )
 
 
 class CookieConfig(BaseModel):
