@@ -1,26 +1,38 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
 
+from api.api_v1.dependencies.auth import (
+    get_current_user_from_refresh_token,
+    get_user_registration_data,
+    get_user_login_data,
+    get_user_during_email_verification,
+    get_user_for_resending_email_verification_token,
+)
 from api.api_v1.schemas.auth_responses import (
     LoginResponse,
     LogoutResponse,
     RegistrationResponse,
     RefreshResponse,
+    ConfirmEmailResponse,
+    ResendingEmailTokenResponse,
 )
-from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
-from api.api_v1.utils.database import get_user_by_username, create_user
-from api.api_v1.dependencies.auth import get_current_user_from_refresh_token
+from api.api_v1.schemas.user import UserRegistrationScheme
+from api.api_v1.utils.database import (
+    create_user,
+    confirm_user_email,
+)
+from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
     create_access_token,
     create_refresh_token,
 )
 from api.api_v1.utils.security import (
     hash_password,
-    verify_password,
+    generate_email_verification_token,
 )
 from core.config import settings
 from core.models import User
@@ -40,23 +52,26 @@ logger = logging.getLogger(__name__)
     response_model=RegistrationResponse,
 )
 async def registration_endpoint(
-    user_data: UserRegistrationScheme = Depends(UserRegistrationScheme.as_form),
+    background_tasks: BackgroundTasks,
+    user_data: UserRegistrationScheme = Depends(get_user_registration_data),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
-    existing_user = await get_user_by_username(
-        username=user_data.username,
-        session=session,
-    )
-    if existing_user:
-        logger.warning("Registration failed: user already exists")
-        raise settings.exc.already_registered_exc
-
     hashed_password = hash_password(password=user_data.password)
+    email_verification_token = generate_email_verification_token()
     await create_user(
         username=user_data.username,
         hashed_password=hashed_password,
+        email=user_data.email,
+        email_verification_token=email_verification_token,
         session=session,
     )
+    send_plain_message_to_email(
+        subject="Email Verification",
+        email_address=user_data.email,
+        body=email_verification_token,
+        background_tasks=background_tasks,
+    )
+
     logger.info("User registered successfully")
     return RegistrationResponse()
 
