@@ -75,3 +75,49 @@ async def get_current_user_from_refresh_token(
         token_type=settings.jwt_auth.refresh_token_type,
         session=session,
     )
+
+
+async def get_user_registration_data(
+    user_data: UserRegistrationScheme = Depends(UserRegistrationScheme.as_form),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> UserRegistrationScheme:
+    existing_user = await get_user_by_username_or_email(
+        username=user_data.username,
+        email=user_data.email,
+        session=session,
+    )
+    if existing_user:
+        logger.warning("Registration failed: user already exists")
+        raise settings.exc.already_registered_exc
+    return user_data
+
+
+
+
+async def get_user_login_data(
+    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    user = await get_user_by_username(
+        username=user_data.username,
+        session=session,
+    )
+    if user is None:
+        logger.warning("Login failed: incorrect login or password")
+        raise settings.exc.auth_exc
+
+    if not verify_password(
+        password=user_data.password, correct_password=user.hashed_password
+    ):
+        logger.warning("Login failed: incorrect login or password")
+        raise settings.exc.auth_exc
+
+    if not user.is_active:
+        logger.warning("Login failed: inactive user")
+        raise settings.exc.inactive_user_exc
+
+    if not user.is_email_verified:
+        logger.warning("Login failed: email not verified")
+        raise settings.exc.not_verified_email_exc
+
+    return user
