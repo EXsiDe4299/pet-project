@@ -83,27 +83,8 @@ async def registration_endpoint(
 )
 async def login_endpoint(
     response: Response,
-    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
-    session: AsyncSession = Depends(db_helper.get_session),
+    user: User = Depends(get_user_login_data),
 ):
-    user = await get_user_by_username(
-        username=user_data.username,
-        session=session,
-    )
-    if user is None:
-        logger.warning("Login failed: incorrect login or password")
-        raise settings.exc.auth_exc
-
-    if not verify_password(
-        password=user_data.password, correct_password=user.hashed_password
-    ):
-        logger.warning("Login failed: incorrect login or password")
-        raise settings.exc.auth_exc
-
-    if not user.is_active:
-        logger.warning("Login failed: inactive user")
-        raise settings.exc.inactive_user_exc
-
     access_token = create_access_token(user=user)
     refresh_token = create_refresh_token(user=user)
 
