@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import Depends, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +23,6 @@ oauth2_scheme = OAuth2PasswordBearer(
     )
 )
 
-logger = logging.getLogger(__name__)
-
 
 async def __get_user_from_token(
     *,
@@ -36,20 +32,16 @@ async def __get_user_from_token(
 ) -> User:
     token_payload = decode_jwt(token=token)
     if not validate_token_type(token_payload=token_payload, expected_type=token_type):
-        logger.warning("Refreshing failed: invalid token type")
         raise settings.exc.invalid_token_type_exc
 
     username = token_payload.get("sub")
     user = await get_user_by_username(username=username, session=session)
     if user is None:
-        logger.warning("Refreshing failed: invalid token")
         raise settings.exc.invalid_token_exc
 
     if not user.is_active:
-        logger.warning("Refreshing failed: inactive user")
         raise settings.exc.inactive_user_exc
     if not user.is_email_verified:
-        logger.warning("Refreshing failed: email not verified")
         raise settings.exc.not_verified_email_exc
 
     return user
@@ -87,7 +79,6 @@ async def get_user_registration_data(
         session=session,
     )
     if existing_user:
-        logger.warning("Registration failed: user already exists")
         raise settings.exc.already_registered_exc
     return user_data
 
@@ -102,10 +93,8 @@ async def get_user_during_email_verification(
         session=session,
     )
     if user is None:
-        logger.warning("Email verification failed: invalid verification code")
         raise settings.exc.invalid_verification_code_exc
     if user.is_email_verified:
-        logger.warning("Email verification failed: email already verified")
         raise settings.exc.email_already_verified_exc
 
     return user
@@ -120,23 +109,14 @@ async def get_user_for_resending_email_verification_token(
         session=session,
     )
     if user is None:
-        logger.warning(
-            "Resending email verification code failed: incorrect login or password"
-        )
         raise settings.exc.auth_exc
 
     if not verify_password(
         password=user_data.password, correct_password=user.hashed_password
     ):
-        logger.warning(
-            "Resending email verification code failed: incorrect login or password"
-        )
         raise settings.exc.auth_exc
 
     if user.is_email_verified:
-        logger.warning(
-            "Resending email verification code failed: email already verified"
-        )
         raise settings.exc.email_already_verified_exc
     return user
 
@@ -150,21 +130,17 @@ async def get_user_login_data(
         session=session,
     )
     if user is None:
-        logger.warning("Login failed: incorrect login or password")
         raise settings.exc.auth_exc
 
     if not verify_password(
         password=user_data.password, correct_password=user.hashed_password
     ):
-        logger.warning("Login failed: incorrect login or password")
         raise settings.exc.auth_exc
 
     if not user.is_active:
-        logger.warning("Login failed: inactive user")
         raise settings.exc.inactive_user_exc
 
     if not user.is_email_verified:
-        logger.warning("Login failed: email not verified")
         raise settings.exc.not_verified_email_exc
 
     return user

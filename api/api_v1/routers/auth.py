@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -43,8 +41,6 @@ auth_router = APIRouter(
     tags=settings.auth_router.tags,
 )
 
-logger = logging.getLogger(__name__)
-
 
 @auth_router.post(
     settings.auth_router.registration_endpoint_prefix,
@@ -72,7 +68,6 @@ async def registration_endpoint(
         background_tasks=background_tasks,
     )
 
-    logger.info("User registered successfully")
     return RegistrationResponse()
 
 
@@ -115,7 +110,6 @@ async def confirm_email_endpoint(
         session=session,
     )
 
-    logger.info("Email confirmed successfully")
     return ConfirmEmailResponse()
 
 
@@ -143,7 +137,6 @@ async def login_endpoint(
         samesite=settings.cookie.samesite,
     )
 
-    logger.info("Successful login")
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -174,7 +167,6 @@ async def refresh_jwt_endpoint(
         samesite=settings.cookie.samesite,
     )
 
-    logger.info("Successful refreshing")
     return RefreshResponse(
         access_token=new_access_token,
         refresh_token=new_refresh_token,
@@ -188,5 +180,4 @@ async def refresh_jwt_endpoint(
 )
 async def logout_endpoint(response: Response):
     response.delete_cookie(settings.cookie.refresh_token_key)
-    logger.info("Successful logout")
     return LogoutResponse()
