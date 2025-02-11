@@ -11,6 +11,14 @@ class RegistrationResponse(BaseAuthResponse):
     pass
 
 
+class ConfirmEmailResponse(BaseAuthResponse):
+    pass
+
+
+class ResendingEmailTokenResponse(BaseAuthResponse):
+    pass
+
+
 class LoginResponse(BaseAuthResponse):
     access_token: str
     refresh_token: str
