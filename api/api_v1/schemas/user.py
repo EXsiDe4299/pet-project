@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
 from fastapi import Form
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class UserBaseScheme(BaseModel):
@@ -18,6 +18,8 @@ class UserInFromFormScheme(UserBaseScheme, ABC):
 
 
 class UserRegistrationScheme(UserInFromFormScheme):
+    email: EmailStr
+
     @classmethod
     def as_form(
         cls,
@@ -25,12 +27,13 @@ class UserRegistrationScheme(UserInFromFormScheme):
             min_length=3,
             max_length=20,
         ),
+        email: EmailStr = Form(),
         password: str = Form(
             min_length=6,
             max_length=100,
         ),
     ) -> "UserRegistrationScheme":
-        return cls(username=username, password=password)
+        return cls(username=username, email=email, password=password)
 
 
 class UserLoginScheme(UserInFromFormScheme):
