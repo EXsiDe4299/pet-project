@@ -28,7 +28,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 logger = logging.getLogger(__name__)
 
 
-async def get_user_from_token(
+async def __get_user_from_token(
     *,
     token: str,
     token_type: str,
@@ -59,7 +59,7 @@ async def get_current_user_from_access_token(
     access_token: str = Depends(oauth2_scheme),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
-    return await get_user_from_token(
+    return await __get_user_from_token(
         token=access_token,
         token_type=settings.jwt_auth.access_token_type,
         session=session,
@@ -70,7 +70,7 @@ async def get_current_user_from_refresh_token(
     refresh_token: str = Cookie(),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
-    return await get_user_from_token(
+    return await __get_user_from_token(
         token=refresh_token,
         token_type=settings.jwt_auth.refresh_token_type,
         session=session,
