@@ -92,6 +92,53 @@ async def get_user_registration_data(
     return user_data
 
 
+async def get_user_during_email_verification(
+    email_verification_token: str,
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    email_verification_token = email_verification_token.lower()
+    user = await get_user_by_email_verification_token(
+        email_verification_token=email_verification_token,
+        session=session,
+    )
+    if user is None:
+        logger.warning("Email verification failed: invalid verification code")
+        raise settings.exc.invalid_verification_code_exc
+    if user.is_email_verified:
+        logger.warning("Email verification failed: email already verified")
+        raise settings.exc.email_already_verified_exc
+
+    return user
+
+
+async def get_user_for_resending_email_verification_token(
+    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    user = await get_user_by_username(
+        username=user_data.username,
+        session=session,
+    )
+    if user is None:
+        logger.warning(
+            "Resending email verification code failed: incorrect login or password"
+        )
+        raise settings.exc.auth_exc
+
+    if not verify_password(
+        password=user_data.password, correct_password=user.hashed_password
+    ):
+        logger.warning(
+            "Resending email verification code failed: incorrect login or password"
+        )
+        raise settings.exc.auth_exc
+
+    if user.is_email_verified:
+        logger.warning(
+            "Resending email verification code failed: email already verified"
+        )
+        raise settings.exc.email_already_verified_exc
+    return user
 
 
 async def get_user_login_data(
