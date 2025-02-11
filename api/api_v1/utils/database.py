@@ -17,11 +17,15 @@ async def get_user_by_username(
 async def create_user(
     username: str,
     hashed_password: bytes,
+    email: str,
+    email_verification_token: str,
     session: AsyncSession,
 ) -> User:
     new_user = User(
         username=username,
         hashed_password=hashed_password,
+        email=email,
+        email_verification_token=email_verification_token,
     )
     session.add(new_user)
     await session.commit()
