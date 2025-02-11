@@ -101,6 +101,25 @@ async def resend_email_verification_token_endpoint(
 
 
 @auth_router.post(
+    settings.auth_router.confirm_email_endpoint_prefix,
+    status_code=status.HTTP_200_OK,
+    response_model=ConfirmEmailResponse,
+)
+async def confirm_email_endpoint(
+    user: User = Depends(get_user_during_email_verification),
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+
+    await confirm_user_email(
+        user=user,
+        session=session,
+    )
+
+    logger.info("Email confirmed successfully")
+    return ConfirmEmailResponse()
+
+
+@auth_router.post(
     settings.auth_router.login_endpoint_prefix,
     status_code=status.HTTP_200_OK,
     response_model=LoginResponse,
