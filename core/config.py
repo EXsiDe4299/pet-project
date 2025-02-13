@@ -148,6 +148,10 @@ class SmtpConfig(BaseModel):
     VALIDATE_CERTS: bool
 
 
+class EmailTokensConfig(BaseModel):
+    email_verification_token_exp_minutes: int = 10
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env.template", ".env"),
@@ -165,6 +169,7 @@ class Settings(BaseSettings):
     v1_router: V1RouterConfig = V1RouterConfig()
     auth_router: AuthRouterConfig = AuthRouterConfig()
     smtp: SmtpConfig
+    email_tokens: EmailTokensConfig = EmailTokensConfig()
 
 
 settings: Settings = Settings()
