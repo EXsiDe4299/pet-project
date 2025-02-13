@@ -22,6 +22,8 @@ from api.api_v1.schemas.user import UserRegistrationScheme
 from api.api_v1.utils.database import (
     create_user,
     confirm_user_email,
+    create_user_email_verification_token,
+    update_user_email_verification_token,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
@@ -58,6 +60,10 @@ async def registration_endpoint(
         username=user_data.username,
         hashed_password=hashed_password,
         email=user_data.email,
+        session=session,
+    )
+    await create_user_email_verification_token(
+        username=user_data.username,
         email_verification_token=email_verification_token,
         session=session,
     )
@@ -83,8 +89,11 @@ async def resend_email_verification_token_endpoint(
 ):
     email_verification_token = generate_email_verification_token()
 
-    user.email_verification_token = email_verification_token
-    await session.commit()
+    await update_user_email_verification_token(
+        user=user,
+        email_verification_token=email_verification_token,
+        session=session,
+    )
 
     send_plain_message_to_email(
         subject="Email Verification",
@@ -104,7 +113,6 @@ async def confirm_email_endpoint(
     user: User = Depends(get_user_during_email_verification),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
-
     await confirm_user_email(
         user=user,
         session=session,
