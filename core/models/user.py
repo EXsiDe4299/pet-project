@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
 from core.models.base import Base
+
+if TYPE_CHECKING:
+    from core.models import Token
 
 
 class User(Base):
@@ -21,4 +26,4 @@ class User(Base):
         default=False,
         server_default=expression.false(),
     )
-    email_verification_token: Mapped[str] = mapped_column(nullable=True)
+    tokens: Mapped["Token"] = relationship(back_populates="user")
