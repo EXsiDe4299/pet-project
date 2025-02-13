@@ -100,7 +100,7 @@ async def get_user_during_email_verification(
     return user
 
 
-async def get_user_for_resending_email_verification_token(
+async def __verify_user(
     user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
@@ -112,31 +112,24 @@ async def get_user_for_resending_email_verification_token(
         raise settings.exc.auth_exc
 
     if not verify_password(
-        password=user_data.password, correct_password=user.hashed_password
+        password=user_data.password,
+        correct_password=user.hashed_password,
     ):
         raise settings.exc.auth_exc
+    return user
 
+
+async def get_user_for_resending_email_verification_token(
+    user: User = Depends(__verify_user),
+) -> User:
     if user.is_email_verified:
         raise settings.exc.email_already_verified_exc
     return user
 
 
 async def get_user_login_data(
-    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
-    session: AsyncSession = Depends(db_helper.get_session),
+    user: User = Depends(__verify_user),
 ) -> User:
-    user = await get_user_by_username(
-        username=user_data.username,
-        session=session,
-    )
-    if user is None:
-        raise settings.exc.auth_exc
-
-    if not verify_password(
-        password=user_data.password, correct_password=user.hashed_password
-    ):
-        raise settings.exc.auth_exc
-
     if not user.is_active:
         raise settings.exc.inactive_user_exc
 
