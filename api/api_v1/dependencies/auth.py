@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import Depends, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,6 +98,8 @@ async def get_user_during_email_verification(
         raise settings.exc.invalid_verification_code_exc
     if user.is_email_verified:
         raise settings.exc.email_already_verified_exc
+    if user.tokens.email_verification_token_exp < datetime.now():
+        raise settings.exc.invalid_token_exc
 
     return user
 
