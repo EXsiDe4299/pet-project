@@ -64,19 +64,11 @@ async def create_user(
     return new_user
 
 
-async def create_user_email_verification_token(
+async def create_user_tokens(
     username: str,
-    email_verification_token: str,
     session: AsyncSession,
 ) -> Token:
-    email_verification_token_exp = datetime.datetime.now() + datetime.timedelta(
-        minutes=settings.email_tokens.email_verification_token_exp_minutes
-    )
-    tokens = Token(
-        username=username,
-        email_verification_token=email_verification_token,
-        email_verification_token_exp=email_verification_token_exp,
-    )
+    tokens = Token(username=username)
     session.add(tokens)
     await session.commit()
     await session.refresh(tokens)
@@ -84,16 +76,19 @@ async def create_user_email_verification_token(
 
 
 async def update_user_email_verification_token(
-    user: User,
+    user_tokens: Token,
     email_verification_token: str,
     session: AsyncSession,
-) -> None:
+    expire_minutes: int = settings.email_tokens.email_verification_token_exp_minutes,
+) -> Token:
     email_verification_token_exp = datetime.datetime.now() + datetime.timedelta(
-        minutes=settings.email_tokens.email_verification_token_exp_minutes
+        minutes=expire_minutes
     )
-    user.tokens.email_verification_token = email_verification_token
-    user.tokens.email_verification_token_exp = email_verification_token_exp
+    user_tokens.email_verification_token = email_verification_token
+    user_tokens.email_verification_token_exp = email_verification_token_exp
     await session.commit()
+    await session.refresh(user_tokens)
+    return user_tokens
 
 
 async def confirm_user_email(
@@ -102,4 +97,5 @@ async def confirm_user_email(
 ) -> None:
     user.is_email_verified = True
     user.tokens.email_verification_token = None
+    user.tokens.email_verification_token_exp = None
     await session.commit()

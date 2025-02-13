@@ -22,8 +22,8 @@ from api.api_v1.schemas.user import UserRegistrationScheme
 from api.api_v1.utils.database import (
     create_user,
     confirm_user_email,
-    create_user_email_verification_token,
     update_user_email_verification_token,
+    create_user_tokens,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
@@ -32,7 +32,7 @@ from api.api_v1.utils.jwt_auth import (
 )
 from api.api_v1.utils.security import (
     hash_password,
-    generate_email_verification_token,
+    generate_email_token,
 )
 from core.config import settings
 from core.models import User
@@ -55,22 +55,26 @@ async def registration_endpoint(
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     hashed_password = hash_password(password=user_data.password)
-    email_verification_token = generate_email_verification_token()
-    await create_user(
+    email_verification_token = generate_email_token()
+    new_user = await create_user(
         username=user_data.username,
         hashed_password=hashed_password,
         email=user_data.email,
         session=session,
     )
-    await create_user_email_verification_token(
-        username=user_data.username,
+    user_tokens = await create_user_tokens(
+        username=new_user.username,
+        session=session,
+    )
+    updated_tokens = await update_user_email_verification_token(
+        user_tokens=user_tokens,
         email_verification_token=email_verification_token,
         session=session,
     )
     send_plain_message_to_email(
         subject="Email Verification",
         email_address=user_data.email,
-        body=email_verification_token,
+        body=updated_tokens.email_verification_token,
         background_tasks=background_tasks,
     )
 
@@ -87,10 +91,10 @@ async def resend_email_verification_token_endpoint(
     user: User = Depends(get_user_for_resending_email_verification_token),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
-    email_verification_token = generate_email_verification_token()
+    email_verification_token = generate_email_token()
 
-    await update_user_email_verification_token(
-        user=user,
+    updated_tokens = await update_user_email_verification_token(
+        user_tokens=user.tokens,
         email_verification_token=email_verification_token,
         session=session,
     )
@@ -98,7 +102,7 @@ async def resend_email_verification_token_endpoint(
     send_plain_message_to_email(
         subject="Email Verification",
         email_address=user.email,
-        body=email_verification_token,
+        body=updated_tokens.email_verification_token,
         background_tasks=background_tasks,
     )
     return ResendingEmailTokenResponse()
