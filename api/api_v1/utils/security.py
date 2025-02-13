@@ -23,7 +23,7 @@ def validate_token_type(token_payload: dict, expected_type: str) -> bool:
     return token_type == expected_type
 
 
-def generate_email_verification_token(length: int = 6) -> str:
+def generate_email_token(length: int = 6) -> str:
     symbols = string.ascii_lowercase + string.digits
     email_verification_token = "".join(secrets.choice(symbols) for _ in range(length))
     return email_verification_token
