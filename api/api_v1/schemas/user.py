@@ -4,13 +4,7 @@ from fastapi import Form
 from pydantic import BaseModel, EmailStr
 
 
-class UserBaseScheme(BaseModel):
-    username: str
-    password: str
-    is_active: bool = True
-
-
-class UserInFromFormScheme(UserBaseScheme, ABC):
+class UserInFromFormScheme(BaseModel, ABC):
     @classmethod
     @abstractmethod
     def as_form(cls):
@@ -19,6 +13,8 @@ class UserInFromFormScheme(UserBaseScheme, ABC):
 
 class UserRegistrationScheme(UserInFromFormScheme):
     email: EmailStr
+    username: str
+    password: str
 
     @classmethod
     def as_form(
@@ -37,10 +33,13 @@ class UserRegistrationScheme(UserInFromFormScheme):
 
 
 class UserLoginScheme(UserInFromFormScheme):
+    username_or_email: str
+    password: str
+
     @classmethod
     def as_form(
         cls,
-        username: str = Form(),
+        username_or_email: str = Form(),
         password: str = Form(),
     ) -> "UserLoginScheme":
-        return cls(username=username, password=password)
+        return cls(username_or_email=username_or_email, password=password)
