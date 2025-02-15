@@ -7,7 +7,7 @@ from api.api_v1.dependencies.auth import (
     get_current_user_from_refresh_token,
     get_user_registration_data,
     get_user_login_data,
-    get_user_during_email_verification,
+    get_user_for_email_confirming,
     get_user_for_resending_email_verification_token,
 )
 from api.api_v1.schemas.auth_responses import (
@@ -63,7 +63,7 @@ async def registration_endpoint(
         session=session,
     )
     user_tokens = await create_user_tokens(
-        username=new_user.username,
+        email=new_user.email,
         session=session,
     )
     updated_tokens = await update_user_email_verification_token(
@@ -114,7 +114,7 @@ async def resend_email_verification_token_endpoint(
     response_model=ConfirmEmailResponse,
 )
 async def confirm_email_endpoint(
-    user: User = Depends(get_user_during_email_verification),
+    user: User = Depends(get_user_for_email_confirming),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     await confirm_user_email(
