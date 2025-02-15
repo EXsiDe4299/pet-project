@@ -14,7 +14,7 @@ class Token(Base):
     __tablename__ = "tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(ForeignKey("users.username"))
+    email: Mapped[str] = mapped_column(ForeignKey("users.email"))
     user: Mapped["User"] = relationship(back_populates="tokens")
 
     email_verification_token: Mapped[str] = mapped_column(nullable=True)
@@ -22,4 +22,4 @@ class Token(Base):
         nullable=True
     )
 
-    __table_args__ = (UniqueConstraint("username"),)
+    __table_args__ = (UniqueConstraint("email"),)

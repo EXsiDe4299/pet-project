@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 class User(Base):
     __tablename__ = "users"
 
-    username: Mapped[str] = mapped_column(String(20), primary_key=True)
+    email: Mapped[str] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     hashed_password: Mapped[bytes] = mapped_column(nullable=False)
-    email: Mapped[str] = mapped_column(nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(
         nullable=False,
         default=True,
