@@ -20,7 +20,7 @@ oauth2_scheme = OAuth2PasswordBearer(
         settings.main_router.prefix
         + settings.v1_router.prefix
         + settings.auth_router.prefix
-        + settings.auth_router.login_endpoint_prefix
+        + settings.auth_router.login_endpoint_path
     )
 )
 

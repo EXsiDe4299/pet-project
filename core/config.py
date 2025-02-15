@@ -127,12 +127,12 @@ class V1RouterConfig(BaseModel):
 class AuthRouterConfig(BaseModel):
     prefix: str = "/auth"
     tags: list[str] = ["Auth"]
-    registration_endpoint_prefix: str = "/register"
-    confirm_email_endpoint_prefix: str = "/confirm-email"
-    login_endpoint_prefix: str = "/login"
-    refresh_endpoint_prefix: str = "/refresh"
-    logout_endpoint_prefix: str = "/logout"
-    resend_email_token_prefix: str = "/resend-email-verification-token"
+    registration_endpoint_path: str = "/register"
+    confirm_email_endpoint_path: str = "/confirm-email"
+    login_endpoint_path: str = "/login"
+    refresh_endpoint_path: str = "/refresh"
+    logout_endpoint_path: str = "/logout"
+    resend_email_token_path: str = "/resend-email-verification-token"
 
 
 class SmtpConfig(BaseModel):
