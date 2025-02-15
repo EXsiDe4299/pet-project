@@ -9,24 +9,16 @@ from core.models import User
 from core.models.token import Token
 
 
-async def get_user_by_username(
-    username: str,
+async def get_user_by_username_or_email(
     session: AsyncSession,
+    username: str = "",
+    email: str = "",
 ) -> User | None:
     stmt = (
-        select(User).options(joinedload(User.tokens)).where(User.username == username)
+        select(User)
+        .options(joinedload(User.tokens))
+        .where(or_(User.username == username, User.email == email))
     )
-    result = await session.execute(stmt)
-    user = result.scalar_one_or_none()
-    return user
-
-
-async def get_user_by_username_or_email(
-    username: str,
-    email: str,
-    session: AsyncSession,
-) -> User | None:
-    stmt = select(User).where(or_(User.username == username, User.email == email))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
@@ -54,9 +46,9 @@ async def create_user(
     session: AsyncSession,
 ) -> User:
     new_user = User(
+        email=email,
         username=username,
         hashed_password=hashed_password,
-        email=email,
     )
     session.add(new_user)
     await session.commit()
@@ -65,10 +57,10 @@ async def create_user(
 
 
 async def create_user_tokens(
-    username: str,
+    email: str,
     session: AsyncSession,
 ) -> Token:
-    tokens = Token(username=username)
+    tokens = Token(email=email)
     session.add(tokens)
     await session.commit()
     await session.refresh(tokens)
