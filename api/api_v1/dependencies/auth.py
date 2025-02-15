@@ -1,12 +1,11 @@
 from datetime import datetime
 
-from fastapi import Depends, Cookie
+from fastapi import Depends, Cookie, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
 from api.api_v1.utils.database import (
-    get_user_by_username,
     get_user_by_email_verification_token,
     get_user_by_username_or_email,
 )
@@ -36,8 +35,8 @@ async def __get_user_from_token(
     if not validate_token_type(token_payload=token_payload, expected_type=token_type):
         raise settings.exc.invalid_token_type_exc
 
-    username = token_payload.get("sub")
-    user = await get_user_by_username(username=username, session=session)
+    email = token_payload.get("sub")
+    user = await get_user_by_username_or_email(email=email, session=session)
     if user is None:
         raise settings.exc.invalid_token_exc
 
@@ -108,8 +107,9 @@ async def __verify_user(
     user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
-    user = await get_user_by_username(
-        username=user_data.username,
+    user = await get_user_by_username_or_email(
+        username=user_data.username_or_email,
+        email=user_data.username_or_email,
         session=session,
     )
     if user is None:
