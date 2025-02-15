@@ -84,8 +84,8 @@ async def get_user_registration_data(
     return user_data
 
 
-async def get_user_during_email_verification(
-    email_verification_token: str,
+async def get_user_for_email_confirming(
+    email_verification_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
     email_verification_token = email_verification_token.lower()
@@ -98,7 +98,7 @@ async def get_user_during_email_verification(
     if user.is_email_verified:
         raise settings.exc.email_already_verified_exc
     if user.tokens.email_verification_token_exp < datetime.now():
-        raise settings.exc.invalid_token_exc
+        raise settings.exc.invalid_verification_code_exc
 
     return user
 
