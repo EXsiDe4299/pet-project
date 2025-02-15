@@ -128,7 +128,7 @@ class AuthRouterConfig(BaseModel):
     prefix: str = "/auth"
     tags: list[str] = ["Auth"]
     registration_endpoint_prefix: str = "/register"
-    confirm_email_endpoint_prefix: str = "/confirm-email/{email_verification_token}"
+    confirm_email_endpoint_prefix: str = "/confirm-email"
     login_endpoint_prefix: str = "/login"
     refresh_endpoint_prefix: str = "/refresh"
     logout_endpoint_prefix: str = "/logout"
