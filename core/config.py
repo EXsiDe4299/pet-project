@@ -152,6 +152,7 @@ class SmtpConfig(BaseModel):
 
 class EmailTokensConfig(BaseModel):
     email_verification_token_exp_minutes: int = 10
+    forgot_password_token_exp_minutes: int = 10
 
 
 class Settings(BaseSettings):
