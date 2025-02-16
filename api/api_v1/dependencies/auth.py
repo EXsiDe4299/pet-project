@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 
 from fastapi import Depends, Cookie, Form
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +8,7 @@ from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
 from api.api_v1.utils.database import (
     get_user_by_email_verification_token,
     get_user_by_username_or_email,
+    get_user_by_forgot_password_token,
 )
 from api.api_v1.utils.jwt_auth import decode_jwt
 from api.api_v1.utils.security import validate_token_type, verify_password
@@ -43,7 +44,7 @@ async def __get_user_from_token(
     if not user.is_active:
         raise settings.exc.inactive_user_exc
     if not user.is_email_verified:
-        raise settings.exc.not_verified_email_exc
+        raise settings.exc.invalid_email_exc
 
     return user
 
@@ -94,11 +95,11 @@ async def get_user_for_email_confirming(
         session=session,
     )
     if user is None:
-        raise settings.exc.invalid_verification_code_exc
+        raise settings.exc.invalid_code_exc
     if user.is_email_verified:
         raise settings.exc.email_already_verified_exc
-    if user.tokens.email_verification_token_exp < datetime.now():
-        raise settings.exc.invalid_verification_code_exc
+    if user.tokens.email_verification_token_exp < datetime.datetime.now():
+        raise settings.exc.invalid_code_exc
 
     return user
 
@@ -123,7 +124,7 @@ async def __verify_user(
     return user
 
 
-async def get_user_for_resending_email_verification_token(
+async def get_user_for_sending_email_verification_token(
     user: User = Depends(__verify_user),
 ) -> User:
     if user.is_email_verified:
@@ -138,6 +139,44 @@ async def get_user_login_data(
         raise settings.exc.inactive_user_exc
 
     if not user.is_email_verified:
-        raise settings.exc.not_verified_email_exc
+        raise settings.exc.invalid_email_exc
+
+    return user
+
+
+async def get_user_for_sending_forgot_password_token(
+    email: str = Form(default=""),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    user = await get_user_by_username_or_email(
+        email=email,
+        session=session,
+    )
+    if user is None:
+        raise settings.exc.invalid_email_exc
+    if not user.is_email_verified:
+        raise settings.exc.invalid_email_exc
+    if not user.is_active:
+        raise settings.exc.inactive_user_exc
+
+    return user
+
+
+async def get_user_for_changing_password(
+    forgot_password_token: str = Form(default=""),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    user = await get_user_by_forgot_password_token(
+        forgot_password_token=forgot_password_token,
+        session=session,
+    )
+    if user is None:
+        raise settings.exc.invalid_code_exc
+    if not user.is_email_verified:
+        raise settings.exc.invalid_email_exc
+    if not user.is_active:
+        raise settings.exc.inactive_user_exc
+    if user.tokens.forgot_password_token_exp < datetime.datetime.now():
+        raise settings.exc.invalid_code_exc
 
     return user
