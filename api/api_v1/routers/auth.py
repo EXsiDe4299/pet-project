@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
@@ -8,7 +8,9 @@ from api.api_v1.dependencies.auth import (
     get_user_registration_data,
     get_user_login_data,
     get_user_for_email_confirming,
-    get_user_for_resending_email_verification_token,
+    get_user_for_sending_email_verification_token,
+    get_user_for_sending_forgot_password_token,
+    get_user_for_changing_password,
 )
 from api.api_v1.schemas.auth_responses import (
     LoginResponse,
@@ -16,7 +18,9 @@ from api.api_v1.schemas.auth_responses import (
     RegistrationResponse,
     RefreshResponse,
     ConfirmEmailResponse,
-    ResendingEmailTokenResponse,
+    SendingEmailTokenResponse,
+    ResetPasswordResponse,
+    ForgotPasswordResponse,
 )
 from api.api_v1.schemas.user import UserRegistrationScheme
 from api.api_v1.utils.database import (
@@ -24,6 +28,8 @@ from api.api_v1.utils.database import (
     confirm_user_email,
     update_user_email_verification_token,
     create_user_tokens,
+    update_forgot_password_token,
+    change_user_password,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
@@ -50,45 +56,32 @@ auth_router = APIRouter(
     response_model=RegistrationResponse,
 )
 async def registration_endpoint(
-    background_tasks: BackgroundTasks,
     user_data: UserRegistrationScheme = Depends(get_user_registration_data),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     hashed_password = hash_password(password=user_data.password)
-    email_verification_token = generate_email_token()
     new_user = await create_user(
         username=user_data.username,
         hashed_password=hashed_password,
         email=user_data.email,
         session=session,
     )
-    user_tokens = await create_user_tokens(
+    await create_user_tokens(
         email=new_user.email,
         session=session,
-    )
-    updated_tokens = await update_user_email_verification_token(
-        user_tokens=user_tokens,
-        email_verification_token=email_verification_token,
-        session=session,
-    )
-    send_plain_message_to_email(
-        subject="Email Verification",
-        email_address=user_data.email,
-        body=updated_tokens.email_verification_token,
-        background_tasks=background_tasks,
     )
 
     return RegistrationResponse()
 
 
 @auth_router.post(
-    settings.auth_router.resend_email_token_path,
+    settings.auth_router.send_email_token_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=ResendingEmailTokenResponse,
+    response_model=SendingEmailTokenResponse,
 )
-async def resend_email_verification_token_endpoint(
+async def send_email_verification_token_endpoint(
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_user_for_resending_email_verification_token),
+    user: User = Depends(get_user_for_sending_email_verification_token),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     email_verification_token = generate_email_token()
@@ -105,7 +98,7 @@ async def resend_email_verification_token_endpoint(
         body=updated_tokens.email_verification_token,
         background_tasks=background_tasks,
     )
-    return ResendingEmailTokenResponse()
+    return SendingEmailTokenResponse()
 
 
 @auth_router.post(
@@ -126,6 +119,52 @@ async def confirm_email_endpoint(
 
 
 @auth_router.post(
+    settings.auth_router.forgot_password_endpoint_path,
+    status_code=status.HTTP_200_OK,
+    response_model=ForgotPasswordResponse,
+)
+async def forgot_password_endpoint(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_user_for_sending_forgot_password_token),
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+    forgot_password_token = generate_email_token()
+    updated_tokens = await update_forgot_password_token(
+        user_tokens=user.tokens,
+        forgot_password_token=forgot_password_token,
+        session=session,
+    )
+
+    send_plain_message_to_email(
+        subject="Resetting password",
+        email_address=user.email,
+        body=updated_tokens.forgot_password_token,
+        background_tasks=background_tasks,
+    )
+
+    return ForgotPasswordResponse()
+
+
+@auth_router.post(
+    settings.auth_router.reset_password_endpoint_path,
+    status_code=status.HTTP_200_OK,
+    response_model=ResetPasswordResponse,
+)
+async def change_password_endpoint(
+    new_password: str = Form(),
+    user: User = Depends(get_user_for_changing_password),
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+    new_hashed_password = hash_password(password=new_password)
+    await change_user_password(
+        user=user,
+        new_hashed_password=new_hashed_password,
+        session=session,
+    )
+    return ResetPasswordResponse()
+
+
+@auth_router.post(
     settings.auth_router.login_endpoint_path,
     status_code=status.HTTP_200_OK,
     response_model=LoginResponse,
@@ -140,8 +179,8 @@ async def login_endpoint(
     response.set_cookie(
         key=settings.cookie.refresh_token_key,
         value=refresh_token,
-        max_age=settings.jwt_auth.refresh_token_expire_minutes,
-        expires=settings.jwt_auth.refresh_token_expire_minutes,
+        max_age=settings.jwt_auth.refresh_token_expire_minutes * 60,
+        expires=settings.jwt_auth.refresh_token_expire_minutes * 60,
         path=settings.cookie.path,
         domain=settings.cookie.domain,
         secure=settings.cookie.secure,
@@ -170,8 +209,8 @@ async def refresh_jwt_endpoint(
     response.set_cookie(
         key=settings.cookie.refresh_token_key,
         value=new_refresh_token,
-        max_age=settings.jwt_auth.refresh_token_expire_minutes,
-        expires=settings.jwt_auth.refresh_token_expire_minutes,
+        max_age=settings.jwt_auth.refresh_token_expire_minutes * 60,
+        expires=settings.jwt_auth.refresh_token_expire_minutes * 60,
         path=settings.cookie.path,
         domain=settings.cookie.domain,
         secure=settings.cookie.secure,
