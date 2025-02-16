@@ -132,8 +132,9 @@ class AuthRouterConfig(BaseModel):
     login_endpoint_path: str = "/login"
     refresh_endpoint_path: str = "/refresh"
     logout_endpoint_path: str = "/logout"
-    resend_email_token_path: str = "/resend-email-verification-token"
     send_email_token_endpoint_path: str = "/send-email-verification-token"
+    forgot_password_endpoint_path: str = "/forgot-password"
+    change_password_endpoint_path: str = "/change-password"
 
 
 class SmtpConfig(BaseModel):
