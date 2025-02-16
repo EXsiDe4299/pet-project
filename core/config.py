@@ -94,16 +94,16 @@ class ExceptionsConfig(NamedTuple):
         detail="Invalid token",
     )
     email_already_verified_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Email already verified",
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Email is already verified",
     )
-    invalid_verification_code_exc: HTTPException = HTTPException(
+    invalid_code_exc: HTTPException = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Invalid verification code",
+        detail="Invalid code",
     )
-    not_verified_email_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Email is not verified",
+    invalid_email_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Email is invalid or not verified",
     )
 
 
