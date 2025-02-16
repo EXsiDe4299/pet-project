@@ -114,6 +114,19 @@ async def update_forgot_password_token(
     return user_tokens
 
 
+async def change_user_password(
+    user: User,
+    new_hashed_password: bytes,
+    session: AsyncSession,
+) -> User:
+    user.hashed_password = new_hashed_password
+    user.tokens.forgot_password_token = None
+    user.tokens.forgot_password_token_exp = None
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 async def confirm_user_email(
     user: User,
     session: AsyncSession,
