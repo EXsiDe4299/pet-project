@@ -39,6 +39,21 @@ async def get_user_by_email_verification_token(
     return user
 
 
+async def get_user_by_forgot_password_token(
+    forgot_password_token: str,
+    session: AsyncSession,
+) -> User | None:
+    stmt = (
+        select(User)
+        .join(User.tokens)
+        .where(Token.forgot_password_token == forgot_password_token)
+        .options(joinedload(User.tokens))
+    )
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    return user
+
+
 async def create_user(
     username: str,
     hashed_password: bytes,
