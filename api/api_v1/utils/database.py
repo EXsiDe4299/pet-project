@@ -98,6 +98,22 @@ async def update_user_email_verification_token(
     return user_tokens
 
 
+async def update_forgot_password_token(
+    user_tokens: Token,
+    forgot_password_token: str,
+    session: AsyncSession,
+    expire_minutes: int = settings.email_tokens.forgot_password_token_exp_minutes,
+) -> Token:
+    forgot_password_token_exp = datetime.datetime.now() + datetime.timedelta(
+        minutes=expire_minutes
+    )
+    user_tokens.forgot_password_token = forgot_password_token
+    user_tokens.forgot_password_token_exp = forgot_password_token_exp
+    await session.commit()
+    await session.refresh(user_tokens)
+    return user_tokens
+
+
 async def confirm_user_email(
     user: User,
     session: AsyncSession,
