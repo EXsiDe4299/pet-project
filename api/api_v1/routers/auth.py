@@ -146,7 +146,7 @@ async def forgot_password_endpoint(
 
 
 @auth_router.post(
-    settings.auth_router.reset_password_endpoint_path,
+    settings.auth_router.change_password_endpoint_path,
     status_code=status.HTTP_200_OK,
     response_model=ResetPasswordResponse,
 )
