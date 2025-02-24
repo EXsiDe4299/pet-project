@@ -151,7 +151,7 @@ async def forgot_password_endpoint(
     response_model=ResetPasswordResponse,
 )
 async def change_password_endpoint(
-    new_password: str = Form(),
+    new_password: str = Form(min_length=3, max_length=100),
     user: User = Depends(get_user_for_changing_password),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
