@@ -79,7 +79,7 @@ class ExceptionsConfig(NamedTuple):
     )
     auth_exc: HTTPException = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect login or password",
+        detail="Incorrect credentials",
     )
     inactive_user_exc: HTTPException = HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
