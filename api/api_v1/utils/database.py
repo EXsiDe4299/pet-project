@@ -1,11 +1,13 @@
 import datetime
+from typing import Sequence
+from uuid import UUID
 
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from core.config import settings
-from core.models import User
+from core.models import User, Story
 from core.models.token import Token
 
 
@@ -134,4 +136,59 @@ async def confirm_user_email(
     user.is_email_verified = True
     user.tokens.email_verification_token = None
     user.tokens.email_verification_token_exp = None
+    await session.commit()
+
+
+async def get_stories(
+    session: AsyncSession,
+) -> Sequence[Story]:
+    result = await session.execute(select(Story))
+    stories = result.scalars().fetchall()
+    return stories
+
+
+async def get_story(
+    story_uuid: UUID,
+    session: AsyncSession,
+) -> Story:
+    result = await session.execute(select(Story).where(Story.id == story_uuid))
+    story = result.scalar_one_or_none()
+    return story
+
+
+async def create_story(
+    name: str,
+    text: str,
+    author_email: str,
+    session: AsyncSession,
+) -> Story:
+    new_story = Story(
+        name=name,
+        text=text,
+        author_email=author_email,
+    )
+    session.add(new_story)
+    await session.commit()
+    await session.refresh(new_story)
+    return new_story
+
+
+async def edit_story(
+    name: str,
+    text: str,
+    story: Story,
+    session: AsyncSession,
+) -> Story:
+    story.name = name
+    story.text = text
+    await session.commit()
+    await session.refresh(story)
+    return story
+
+
+async def delete_story(
+    story: Story,
+    session: AsyncSession,
+):
+    await session.delete(story)
     await session.commit()
