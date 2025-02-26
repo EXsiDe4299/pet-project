@@ -7,7 +7,7 @@ from sqlalchemy.sql import expression
 from core.models.base import Base
 
 if TYPE_CHECKING:
-    from core.models import Token
+    from core.models import Token, Story
 
 
 class User(Base):
@@ -27,3 +27,4 @@ class User(Base):
         server_default=expression.false(),
     )
     tokens: Mapped["Token"] = relationship(back_populates="user")
+    stories: Mapped[list["Story"]] = relationship(back_populates="author")
