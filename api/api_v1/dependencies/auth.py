@@ -28,7 +28,6 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 
 async def __get_user_from_token(
-    *,
     token: str,
     token_type: str,
     session: AsyncSession,
