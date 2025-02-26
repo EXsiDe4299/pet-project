@@ -2,7 +2,7 @@ import datetime
 
 from fastapi import Depends, Cookie, Form
 from fastapi.security import OAuth2PasswordBearer
-from jwt import DecodeError
+from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
@@ -35,7 +35,7 @@ async def __get_user_from_token(
 ) -> User:
     try:
         token_payload = decode_jwt(token=token)
-    except DecodeError:
+    except InvalidTokenError:
         raise settings.exc.invalid_token_exc
     if not validate_token_type(token_payload=token_payload, expected_type=token_type):
         raise settings.exc.invalid_token_type_exc
