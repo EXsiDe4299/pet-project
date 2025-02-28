@@ -1,44 +1,49 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Form, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.dependencies.auth import get_current_user_from_access_token
+from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
+from api.api_v1.schemas.story import StoryScheme
 from api.api_v1.utils.database import (
     get_stories,
-    get_story,
     create_story,
     edit_story,
     delete_story,
+    like_story,
+    get_author_stories,
 )
-from core.models import User
+from core.config import settings
+from core.models import User, Story
 from core.models.db_helper import db_helper
 
 stories_router = APIRouter(
-    prefix="/stories",
-    tags=["Stories"],
+    prefix=settings.stories_router.prefix,
+    tags=settings.stories_router.tags,
 )
 
 
-@stories_router.get("/")
+@stories_router.get(
+    settings.stories_router.get_stories_endpoint_path,
+    response_model=list[StoryScheme],
+)
 async def get_stories_endpoint(session: AsyncSession = Depends(db_helper.get_session)):
     stories = await get_stories(session=session)
     return stories
 
 
-@stories_router.get("/{story_uuid}")
-async def get_story_endpoint(
-    story_uuid: UUID,
-    session: AsyncSession = Depends(db_helper.get_session),
-):
-    story = await get_story(
-        story_uuid=story_uuid,
-        session=session,
-    )
+@stories_router.get(
+    settings.stories_router.get_story_endpoint_path,
+    response_model=StoryScheme,
+)
+async def get_story_endpoint(story: Story = Depends(get_story_by_uuid_dependency)):
     return story
 
 
 @stories_router.post("/")
+@stories_router.post(
+    settings.stories_router.create_story_endpoint_path,
+    response_model=StoryScheme,
+)
 async def create_story_endpoint(
     name: str = Form(),
     text: str = Form(),
@@ -54,18 +59,17 @@ async def create_story_endpoint(
     return new_story
 
 
-@stories_router.put("/{story_uuid}")
+@stories_router.put(
+    settings.stories_router.edit_story_endpoint_path,
+    response_model=StoryScheme,
+)
 async def edit_story_endpoint(
-    story_uuid: UUID,
+    story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
     name: str = Form(),
     text: str = Form(),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_current_user_from_access_token),  # noqa
 ):
-    story = await get_story(
-        story_uuid=story_uuid,
-        session=session,
-    )
     edited_story = await edit_story(
         name=name,
         text=text,
@@ -75,11 +79,11 @@ async def edit_story_endpoint(
     return edited_story
 
 
-@stories_router.delete("/{story_uuid}")
+@stories_router.delete(settings.stories_router.delete_story_endpoint_path)
 async def delete_story_endpoint(
-    story_uuid: UUID,
+    story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_current_user_from_access_token),  # noqa
 ):
     story = await get_story(
         story_uuid=story_uuid,
