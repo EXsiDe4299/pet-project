@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from core.config import settings
 from core.models import User, Story
@@ -142,16 +142,21 @@ async def confirm_user_email(
 async def get_stories(
     session: AsyncSession,
 ) -> Sequence[Story]:
-    result = await session.execute(select(Story))
+    result = await session.execute(select(Story).options(selectinload(Story.author)))
     stories = result.scalars().fetchall()
     return stories
 
 
-async def get_story(
+async def get_story_by_uuid(
     story_uuid: UUID,
     session: AsyncSession,
 ) -> Story:
-    result = await session.execute(select(Story).where(Story.id == story_uuid))
+    result = await session.execute(
+        select(Story)
+        .where(Story.id == story_uuid)
+        .options(selectinload(Story.likers))
+        .options(selectinload(Story.author))
+    )
     story = result.scalar_one_or_none()
     return story
 
