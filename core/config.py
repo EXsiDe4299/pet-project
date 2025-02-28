@@ -105,6 +105,10 @@ class ExceptionsConfig(NamedTuple):
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Email is invalid or not verified",
     )
+    story_not_found_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Story not found",
+    )
 
 
 class CookieConfig(BaseModel):
@@ -135,6 +139,18 @@ class AuthRouterConfig(BaseModel):
     send_email_token_endpoint_path: str = "/send-email-verification-token"
     forgot_password_endpoint_path: str = "/forgot-password"
     change_password_endpoint_path: str = "/change-password"
+
+
+class StoriesRouterConfig(BaseModel):
+    prefix: str = "/sories"
+    tags: list[str] = ["Stories"]
+    get_stories_endpoint_path: str = "/"
+    get_story_endpoint_path: str = "/{story_uuid}"
+    get_author_stories_endpoint_path: str = "/"
+    create_story_endpoint_path: str = "/"
+    edit_story_endpoint_path: str = "/{story_uuid}"
+    delete_story_endpoint_path: str = "/{story_uuid}"
+    like_story_endpoint_path: str = "/{story_uuid}/like"
 
 
 class SmtpConfig(BaseModel):
@@ -173,6 +189,7 @@ class Settings(BaseSettings):
     auth_router: AuthRouterConfig = AuthRouterConfig()
     smtp: SmtpConfig
     email_tokens: EmailTokensConfig = EmailTokensConfig()
+    stories_router: StoriesRouterConfig = StoriesRouterConfig()
 
 
 settings: Settings = Settings()
