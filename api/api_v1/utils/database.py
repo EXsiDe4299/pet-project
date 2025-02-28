@@ -211,3 +211,17 @@ async def delete_story(
 ):
     await session.delete(story)
     await session.commit()
+
+
+async def like_story(
+    story: Story,
+    user: User,
+    session: AsyncSession,
+):
+    if user not in story.likers:
+        story.likes_number += 1
+        story.likers.append(user)
+    else:
+        story.likes_number -= 1
+        story.likers.remove(user)
+    await session.commit()
