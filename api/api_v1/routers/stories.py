@@ -39,7 +39,21 @@ async def get_story_endpoint(story: Story = Depends(get_story_by_uuid_dependency
     return story
 
 
-@stories_router.post("/")
+@stories_router.get(
+    settings.stories_router.get_author_stories_endpoint_path,
+    response_model=list[StoryScheme],
+)
+async def get_author_stories_endpoint(
+    author: str,
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+    stories = await get_author_stories(
+        author_username=author,
+        session=session,
+    )
+    return stories
+
+
 @stories_router.post(
     settings.stories_router.create_story_endpoint_path,
     response_model=StoryScheme,
@@ -85,10 +99,6 @@ async def delete_story_endpoint(
     session: AsyncSession = Depends(db_helper.get_session),
     user: User = Depends(get_current_user_from_access_token),  # noqa
 ):
-    story = await get_story(
-        story_uuid=story_uuid,
-        session=session,
-    )
     await delete_story(
         story=story,
         session=session,
