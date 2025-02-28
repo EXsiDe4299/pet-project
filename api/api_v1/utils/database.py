@@ -161,6 +161,20 @@ async def get_story_by_uuid(
     return story
 
 
+async def get_author_stories(
+    author_username: str,
+    session: AsyncSession,
+) -> Sequence[Story]:
+    result = await session.execute(
+        select(Story)
+        .where(User.username == author_username)
+        .options(selectinload(Story.likers))
+        .options(selectinload(Story.author))
+    )
+    stories = result.scalars().fetchall()
+    return stories
+
+
 async def create_story(
     name: str,
     text: str,
