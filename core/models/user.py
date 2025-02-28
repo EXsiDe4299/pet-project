@@ -28,3 +28,8 @@ class User(Base):
     )
     tokens: Mapped["Token"] = relationship(back_populates="user")
     stories: Mapped[list["Story"]] = relationship(back_populates="author")
+
+    liked_stories: Mapped[list["Story"]] = relationship(
+        secondary="user_story_association",
+        back_populates="likers",
+    )

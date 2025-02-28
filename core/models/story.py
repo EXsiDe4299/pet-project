@@ -29,3 +29,14 @@ class Story(Base):
 
     author_email: Mapped[str] = mapped_column(ForeignKey("users.email"), nullable=False)
     author: Mapped["User"] = relationship(back_populates="stories")
+
+    likers: Mapped[list["User"]] = relationship(
+        secondary="user_story_association",
+        back_populates="liked_stories",
+    )
+
+    @validates("likes_number")
+    def validate_likes_number(self, key, likes_number):
+        if likes_number < 0:
+            raise ValueError("likes_number value cannot be less than 0")
+        return likes_number
