@@ -104,3 +104,17 @@ async def delete_story_endpoint(
         session=session,
     )
     return {"status": "success"}
+
+
+@stories_router.post(settings.stories_router.like_story_endpoint_path)
+async def like_story_endpoint(
+    story: Story = Depends(get_story_by_uuid_dependency),
+    session: AsyncSession = Depends(db_helper.get_session),
+    user: User = Depends(get_current_user_from_access_token),
+):
+    await like_story(
+        story=story,
+        user=user,
+        session=session,
+    )
+    return {"status": "success"}
