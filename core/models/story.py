@@ -21,6 +21,11 @@ class Story(Base):
     )
     name: Mapped[str] = mapped_column(nullable=False)
     text: Mapped[str] = mapped_column(Text(), nullable=False)
+    likes_number: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+        server_default=text_("0"),
+    )
 
     author_email: Mapped[str] = mapped_column(ForeignKey("users.email"), nullable=False)
     author: Mapped["User"] = relationship(back_populates="stories")
