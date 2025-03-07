@@ -1,4 +1,5 @@
 import re
+import uuid
 
 import jwt
 import pytest
@@ -16,6 +17,13 @@ from api.api_v1.utils.database import (
     get_user_by_forgot_password_token,
     change_user_password,
     confirm_user_email,
+    create_story,
+    get_stories,
+    get_story_by_uuid,
+    get_author_stories,
+    edit_story,
+    like_story,
+    delete_story,
 )
 from api.api_v1.utils.jwt_auth import (
     encode_jwt,
@@ -443,3 +451,145 @@ class TestDatabase:
         assert not first_user.is_email_verified
         await confirm_user_email(user=first_user, session=session)
         assert first_user.is_email_verified
+
+    async def test_create_story_nonexistent_author(
+        self,
+        session: AsyncSession,
+    ):
+        with pytest.raises(IntegrityError):
+            await create_story(
+                name="test story name",
+                text="test story text",
+                author_email="nonexistent@email.com",
+                session=session,
+            )
+
+    @pytest.mark.parametrize(
+        "name,text",
+        (
+            ("first test story name", "first test story text"),
+            ("second test story name", "second test story text"),
+        ),
+    )
+    async def test_create_story_success(
+        self,
+        first_user: User,
+        session: AsyncSession,
+        name: str,
+        text: str,
+    ):
+        story = await create_story(
+            name=name,
+            text=text,
+            author_email=first_user.email,
+            session=session,
+        )
+        assert story.name == name
+        assert story.text == text
+        assert story.author_email == first_user.email
+
+    async def test_get_stories(
+        self,
+        session: AsyncSession,
+    ):
+        stories = await get_stories(session=session)
+        assert len(stories) == 2
+
+    async def test_get_story_by_invalid_uuid(
+        self,
+        session: AsyncSession,
+    ):
+        story = await get_story_by_uuid(
+            story_uuid=uuid.uuid4(),
+            session=session,
+        )
+        assert story is None
+
+    async def test_get_story_by_uuid(
+        self,
+        session: AsyncSession,
+    ):
+        stories = await get_stories(session=session)
+        story = await get_story_by_uuid(
+            story_uuid=stories[0].id,
+            session=session,
+        )
+        assert story is not None
+
+    async def test_get_author_stories_nonexistent(
+        self,
+        session: AsyncSession,
+    ):
+        stories = await get_author_stories(
+            author_username="nonexistent",
+            session=session,
+        )
+        assert len(stories) == 0
+
+    async def test_get_author_stories(
+        self,
+        session: AsyncSession,
+        first_user: User,
+    ):
+        stories = await get_author_stories(
+            author_username=first_user.username,
+            session=session,
+        )
+        assert len(stories) == 2
+
+    async def test_edit_story(
+        self,
+        session: AsyncSession,
+        first_user: User,
+    ):
+        stories = await get_author_stories(
+            author_username=first_user.username,
+            session=session,
+        )
+        story = stories[0]
+        edited_story = await edit_story(
+            name="edited test story name",
+            text="edited test story text",
+            story=story,
+            session=session,
+        )
+        story_with_changes = await get_story_by_uuid(
+            story_uuid=story.id,
+            session=session,
+        )
+        assert edited_story.name == story_with_changes.name
+        assert edited_story.text == story_with_changes.text
+
+    async def test_like_story(
+        self,
+        session: AsyncSession,
+        first_user: User,
+    ):
+        stories = await get_author_stories(
+            author_username=first_user.username,
+            session=session,
+        )
+        story = stories[0]
+        await like_story(story=story, user=story.author, session=session)
+        liked_story = await get_story_by_uuid(
+            story_uuid=story.id,
+            session=session,
+        )
+        assert liked_story.likes_number == 1
+
+    async def test_delete_story(
+        self,
+        session: AsyncSession,
+        first_user: User,
+    ):
+        stories = await get_author_stories(
+            author_username=first_user.username,
+            session=session,
+        )
+        story = stories[0]
+        await delete_story(story=story, session=session)
+        deleted_story = await get_story_by_uuid(
+            story_uuid=story.id,
+            session=session,
+        )
+        assert deleted_story is None
