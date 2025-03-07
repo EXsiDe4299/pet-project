@@ -142,7 +142,11 @@ async def confirm_user_email(
 async def get_stories(
     session: AsyncSession,
 ) -> Sequence[Story]:
-    result = await session.execute(select(Story).options(selectinload(Story.author)))
+    result = await session.execute(
+        select(Story, User)
+        .join(User, User.email == Story.author_email)
+        .options(selectinload(Story.author))
+    )
     stories = result.scalars().fetchall()
     return stories
 
@@ -166,7 +170,8 @@ async def get_author_stories(
     session: AsyncSession,
 ) -> Sequence[Story]:
     result = await session.execute(
-        select(Story)
+        select(Story, User)
+        .join(User, User.email == Story.author_email)
         .where(User.username == author_username)
         .options(selectinload(Story.likers))
         .options(selectinload(Story.author))
