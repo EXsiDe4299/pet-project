@@ -132,3 +132,11 @@ def fourth_user_data() -> dict[str, str]:
         "password": "fourthpassword",
         "email": "fourth_fake_email@fakedomain.com",
     }
+
+
+@pytest.fixture()
+def story_data() -> dict[str, str]:
+    return {
+        "name": "story name",
+        "text": "story text",
+    }
