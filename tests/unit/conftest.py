@@ -63,7 +63,7 @@ def token_data() -> dict[str, str]:
     }
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def session() -> AsyncSession:
     s = await anext(db_helper.get_session())
     yield s
