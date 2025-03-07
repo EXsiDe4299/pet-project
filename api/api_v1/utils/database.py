@@ -1,14 +1,37 @@
 import datetime
-from typing import Sequence
+import functools
+from typing import Sequence, Callable
 from uuid import UUID
 
 from sqlalchemy import select, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from typing_extensions import TypeVar
 
 from core.config import settings
 from core.models import User, Story
 from core.models.token import Token
+
+T = TypeVar("T")
+
+
+def __rollback_if_db_exception():
+    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+        @functools.wraps(func)
+        async def wrapped(**kwargs):
+            session = None
+            try:
+                session = kwargs.get("session")
+                result = await func(**kwargs)
+                return result
+            except SQLAlchemyError:
+                await session.rollback()
+                raise
+
+        return wrapped
+
+    return wrapper
 
 
 async def get_user_by_username_or_email(
@@ -19,6 +42,7 @@ async def get_user_by_username_or_email(
     stmt = (
         select(User)
         .options(joinedload(User.tokens))
+        .options(selectinload(User.stories))
         .where(or_(User.username == username, User.email == email))
     )
     result = await session.execute(stmt)
@@ -56,7 +80,9 @@ async def get_user_by_forgot_password_token(
     return user
 
 
+@__rollback_if_db_exception()
 async def create_user(
+    *,
     username: str,
     hashed_password: bytes,
     email: str,
@@ -73,7 +99,9 @@ async def create_user(
     return new_user
 
 
+@__rollback_if_db_exception()
 async def create_user_tokens(
+    *,
     email: str,
     session: AsyncSession,
 ) -> Token:
@@ -84,7 +112,9 @@ async def create_user_tokens(
     return tokens
 
 
+@__rollback_if_db_exception()
 async def update_user_email_verification_token(
+    *,
     user_tokens: Token,
     email_verification_token: str,
     session: AsyncSession,
@@ -100,7 +130,9 @@ async def update_user_email_verification_token(
     return user_tokens
 
 
+@__rollback_if_db_exception()
 async def update_forgot_password_token(
+    *,
     user_tokens: Token,
     forgot_password_token: str,
     session: AsyncSession,
@@ -116,7 +148,9 @@ async def update_forgot_password_token(
     return user_tokens
 
 
+@__rollback_if_db_exception()
 async def change_user_password(
+    *,
     user: User,
     new_hashed_password: bytes,
     session: AsyncSession,
@@ -129,7 +163,9 @@ async def change_user_password(
     return user
 
 
+@__rollback_if_db_exception()
 async def confirm_user_email(
+    *,
     user: User,
     session: AsyncSession,
 ) -> None:
@@ -180,7 +216,9 @@ async def get_author_stories(
     return stories
 
 
+@__rollback_if_db_exception()
 async def create_story(
+    *,
     name: str,
     text: str,
     author_email: str,
@@ -197,7 +235,9 @@ async def create_story(
     return new_story
 
 
+@__rollback_if_db_exception()
 async def edit_story(
+    *,
     name: str,
     text: str,
     story: Story,
@@ -210,7 +250,9 @@ async def edit_story(
     return story
 
 
+@__rollback_if_db_exception()
 async def delete_story(
+    *,
     story: Story,
     session: AsyncSession,
 ) -> None:
@@ -218,7 +260,9 @@ async def delete_story(
     await session.commit()
 
 
+@__rollback_if_db_exception()
 async def like_story(
+    *,
     story: Story,
     user: User,
     session: AsyncSession,
