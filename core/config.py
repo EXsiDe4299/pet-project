@@ -109,6 +109,10 @@ class ExceptionsConfig(NamedTuple):
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Story not found",
     )
+    manage_other_story_exc: HTTPException = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You can manage only your own stories",
+    )
 
 
 class CookieConfig(BaseModel):
