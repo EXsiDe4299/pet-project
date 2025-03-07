@@ -144,7 +144,7 @@ class AuthRouterConfig(BaseModel):
 class StoriesRouterConfig(BaseModel):
     prefix: str = "/stories"
     tags: list[str] = ["Stories"]
-    get_stories_endpoint_path: str = "/"
+    get_stories_endpoint_path: str = "/all"
     get_story_endpoint_path: str = "/{story_uuid}"
     get_author_stories_endpoint_path: str = "/"
     create_story_endpoint_path: str = "/"
