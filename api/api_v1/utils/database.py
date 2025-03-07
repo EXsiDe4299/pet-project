@@ -154,7 +154,7 @@ async def get_stories(
 async def get_story_by_uuid(
     story_uuid: UUID,
     session: AsyncSession,
-) -> Story:
+) -> Story | None:
     result = await session.execute(
         select(Story)
         .where(Story.id == story_uuid)
@@ -213,7 +213,7 @@ async def edit_story(
 async def delete_story(
     story: Story,
     session: AsyncSession,
-):
+) -> None:
     await session.delete(story)
     await session.commit()
 
@@ -222,7 +222,7 @@ async def like_story(
     story: Story,
     user: User,
     session: AsyncSession,
-):
+) -> None:
     if user not in story.likers:
         story.likes_number += 1
         story.likers.append(user)
