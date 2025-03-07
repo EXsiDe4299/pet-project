@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Form, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 
 from api.api_v1.dependencies.auth import get_current_user_from_access_token
 from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
-from api.api_v1.schemas.story import StoryScheme
+from api.api_v1.schemas.story import StoryScheme, StoryInScheme
 from api.api_v1.utils.database import (
     get_stories,
     create_story,
@@ -25,6 +26,7 @@ stories_router = APIRouter(
 @stories_router.get(
     settings.stories_router.get_stories_endpoint_path,
     response_model=list[StoryScheme],
+    status_code=status.HTTP_200_OK,
 )
 async def get_stories_endpoint(session: AsyncSession = Depends(db_helper.get_session)):
     stories = await get_stories(session=session)
@@ -34,6 +36,7 @@ async def get_stories_endpoint(session: AsyncSession = Depends(db_helper.get_ses
 @stories_router.get(
     settings.stories_router.get_story_endpoint_path,
     response_model=StoryScheme,
+    status_code=status.HTTP_200_OK,
 )
 async def get_story_endpoint(story: Story = Depends(get_story_by_uuid_dependency)):
     return story
@@ -42,6 +45,7 @@ async def get_story_endpoint(story: Story = Depends(get_story_by_uuid_dependency
 @stories_router.get(
     settings.stories_router.get_author_stories_endpoint_path,
     response_model=list[StoryScheme],
+    status_code=status.HTTP_200_OK,
 )
 async def get_author_stories_endpoint(
     author: str,
@@ -57,16 +61,16 @@ async def get_author_stories_endpoint(
 @stories_router.post(
     settings.stories_router.create_story_endpoint_path,
     response_model=StoryScheme,
+    status_code=status.HTTP_201_CREATED,
 )
 async def create_story_endpoint(
-    name: str = Form(),
-    text: str = Form(),
+    story_data: StoryInScheme = Depends(StoryInScheme.as_form),
     user: User = Depends(get_current_user_from_access_token),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     new_story = await create_story(
-        name=name,
-        text=text,
+        name=story_data.name,
+        text=story_data.text,
         author_email=user.email,
         session=session,
     )
@@ -76,37 +80,47 @@ async def create_story_endpoint(
 @stories_router.put(
     settings.stories_router.edit_story_endpoint_path,
     response_model=StoryScheme,
+    status_code=status.HTTP_200_OK,
 )
 async def edit_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
-    name: str = Form(),
-    text: str = Form(),
+    story_data: StoryInScheme = Depends(StoryInScheme.as_form),
     user: User = Depends(get_current_user_from_access_token),  # noqa
 ):
-    edited_story = await edit_story(
-        name=name,
-        text=text,
-        story=story,
-        session=session,
-    )
-    return edited_story
+    if story in user.stories:
+        edited_story = await edit_story(
+            name=story_data.name,
+            text=story_data.text,
+            story=story,
+            session=session,
+        )
+        return edited_story
+    raise settings.exc.manage_other_story_exc
 
 
-@stories_router.delete(settings.stories_router.delete_story_endpoint_path)
+@stories_router.delete(
+    settings.stories_router.delete_story_endpoint_path,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
     user: User = Depends(get_current_user_from_access_token),  # noqa
 ):
-    await delete_story(
-        story=story,
-        session=session,
-    )
-    return {"status": "success"}
+    if story in user.stories:
+        await delete_story(
+            story=story,
+            session=session,
+        )
+        return {"status": "success"}
+    raise settings.exc.manage_other_story_exc
 
 
-@stories_router.post(settings.stories_router.like_story_endpoint_path)
+@stories_router.post(
+    settings.stories_router.like_story_endpoint_path,
+    status_code=status.HTTP_200_OK,
+)
 async def like_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
