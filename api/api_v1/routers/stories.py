@@ -12,6 +12,7 @@ from api.api_v1.utils.database import (
     delete_story,
     like_story,
     get_author_stories,
+    get_stories_by_name_or_text,
 )
 from core.config import settings
 from core.models import User, Story
@@ -30,6 +31,22 @@ stories_router = APIRouter(
 )
 async def get_stories_endpoint(session: AsyncSession = Depends(db_helper.get_session)):
     stories = await get_stories(session=session)
+    return stories
+
+
+@stories_router.get(
+    settings.stories_router.get_stories_by_name_or_text_endpoint_path,
+    response_model=list[StoryScheme],
+    status_code=status.HTTP_200_OK,
+)
+async def get_stories_by_name_or_text_endpoint(
+    query: str,
+    session: AsyncSession = Depends(db_helper.get_session),
+):
+    stories = await get_stories_by_name_or_text(
+        query=query,
+        session=session,
+    )
     return stories
 
 
