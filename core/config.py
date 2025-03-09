@@ -150,6 +150,7 @@ class StoriesRouterConfig(BaseModel):
     tags: list[str] = ["Stories"]
     get_stories_endpoint_path: str = "/all"
     get_story_endpoint_path: str = "/{story_uuid}"
+    get_stories_by_name_or_text_endpoint_path: str = "/search"
     get_author_stories_endpoint_path: str = "/"
     create_story_endpoint_path: str = "/"
     edit_story_endpoint_path: str = "/{story_uuid}"
