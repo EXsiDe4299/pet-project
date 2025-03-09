@@ -187,6 +187,20 @@ async def get_stories(
     return stories
 
 
+async def get_stories_by_name_or_text(
+    query: str,
+    session: AsyncSession,
+) -> Sequence[Story]:
+    result = await session.execute(
+        select(Story, User)
+        .join(User, User.email == Story.author_email)
+        .where(or_(Story.name.ilike(f"%{query}%"), Story.text.ilike(f"%{query}%")))
+        .options(selectinload(Story.author))
+    )
+    stories = result.scalars().fetchall()
+    return stories
+
+
 async def get_story_by_uuid(
     story_uuid: UUID,
     session: AsyncSession,
