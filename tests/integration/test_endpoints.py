@@ -793,6 +793,25 @@ class TestStory:
             assert isinstance(response.json(), list)
             assert len(response.json()) == 1
 
+    class TestGetStoriesByNameOrText:
+        async def test_get_stories_by_name_or_text_nonexistent(
+            self,
+            async_client: AsyncClient,
+        ):
+            response = await async_client.get(url=f"/stories/search?query=nonexistent")
+            assert response.status_code == 200
+            assert isinstance(response.json(), list)
+            assert len(response.json()) == 0
+
+        async def test_get_stories_by_name_or_text(
+            self,
+            async_client: AsyncClient,
+        ):
+            response = await async_client.get(url=f"/stories/search?query=story")
+            assert response.status_code == 200
+            assert isinstance(response.json(), list)
+            assert len(response.json()) == 1
+
     class TestEditStory:
         async def test_edit_story(
             self,
