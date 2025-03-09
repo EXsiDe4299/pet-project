@@ -24,6 +24,7 @@ from api.api_v1.utils.database import (
     edit_story,
     like_story,
     delete_story,
+    get_stories_by_name_or_text,
 )
 from api.api_v1.utils.jwt_auth import (
     encode_jwt,
@@ -533,6 +534,26 @@ class TestDatabase:
     ):
         stories = await get_author_stories(
             author_username=first_user.username,
+            session=session,
+        )
+        assert len(stories) == 2
+
+    async def test_get_stories_by_name_or_text_nonexistent(
+        self,
+        session: AsyncSession,
+    ):
+        stories = await get_stories_by_name_or_text(
+            query="nonexistent",
+            session=session,
+        )
+        assert len(stories) == 0
+
+    async def test_get_stories_by_name_or_text(
+        self,
+        session: AsyncSession,
+    ):
+        stories = await get_stories_by_name_or_text(
+            query="story",
             session=session,
         )
         assert len(stories) == 2
