@@ -1,11 +1,9 @@
 import logging
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Literal
 
-from fastapi import HTTPException
 from pydantic import BaseModel, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from starlette import status
 
 
 class RunConfig(BaseModel):
@@ -70,49 +68,6 @@ class JWTAuthConfig(BaseModel):
     refresh_token_type: str = "refresh"
     token_type_payload_key: str = "token_type"
     token_header_prefix: str = "Bearer"
-
-
-class ExceptionsConfig(NamedTuple):
-    already_registered_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="User already registered",
-    )
-    auth_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect credentials",
-    )
-    inactive_user_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Inactive user",
-    )
-    invalid_token_type_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid token type",
-    )
-    invalid_token_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid token",
-    )
-    email_already_verified_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="Email is already verified",
-    )
-    invalid_code_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Invalid code",
-    )
-    invalid_email_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Email is invalid or not verified",
-    )
-    story_not_found_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Story not found",
-    )
-    manage_other_story_exc: HTTPException = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="You can manage only your own stories",
-    )
 
 
 class CookieConfig(BaseModel):
@@ -187,7 +142,6 @@ class Settings(BaseSettings):
     db: DatabaseConfig
     log: LoggingConfig = LoggingConfig()
     jwt_auth: JWTAuthConfig = JWTAuthConfig()
-    exc: ExceptionsConfig = ExceptionsConfig()
     cookie: CookieConfig = CookieConfig()
     main_router: MainRouterConfig = MainRouterConfig()
     v1_router: V1RouterConfig = V1RouterConfig()
