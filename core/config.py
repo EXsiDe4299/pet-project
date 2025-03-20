@@ -131,6 +131,16 @@ class EmailTokensConfig(BaseModel):
     forgot_password_token_exp_minutes: int = 10
 
 
+class AvatarConfig(BaseModel):
+    avatars_dir: Path = Path(__file__).parent.parent / "avatars"
+    allowed_extensions_to_mime: dict[str, str] = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+    }
+    size: tuple[int] = (200, 200)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=(".env.template", ".env"),
@@ -149,6 +159,7 @@ class Settings(BaseSettings):
     smtp: SmtpConfig
     email_tokens: EmailTokensConfig = EmailTokensConfig()
     stories_router: StoriesRouterConfig = StoriesRouterConfig()
+    avatar: AvatarConfig = AvatarConfig()
 
 
 settings: Settings = Settings()
