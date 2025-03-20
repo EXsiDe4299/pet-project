@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
@@ -16,6 +16,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     hashed_password: Mapped[bytes] = mapped_column(nullable=False)
+    bio: Mapped[str] = mapped_column(
+        Text(),
+        nullable=True,
+    )
+    avatar_name: Mapped[str] = mapped_column(nullable=True)
     is_active: Mapped[bool] = mapped_column(
         nullable=False,
         default=True,
