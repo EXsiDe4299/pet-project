@@ -288,3 +288,18 @@ async def like_story(
         story.likes_number -= 1
         story.likers.remove(user)
     await session.commit()
+
+
+@__rollback_if_db_exception()
+async def update_user(
+    *,
+    bio: str | None = None,
+    avatar_name: str | None = None,
+    user: User,
+    session: AsyncSession,
+) -> User:
+    user.bio = bio
+    user.avatar_name = avatar_name
+    await session.commit()
+    await session.refresh(user)
+    return user
