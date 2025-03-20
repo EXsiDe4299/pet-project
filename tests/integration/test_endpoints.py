@@ -4,12 +4,21 @@ import pytest
 from httpx import AsyncClient, Cookies
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.api_v1.exceptions.http_exceptions import (
+    AlreadyRegistered,
+    InvalidCredentials,
+    InvalidConfirmEmailCode,
+    InvalidEmail,
+    InvalidChangePasswordCode,
+    InvalidJWT,
+    InvalidJWTType,
+    StoryNotFound,
+)
 from api.api_v1.utils.database import (
     get_user_by_username_or_email,
     update_forgot_password_token,
 )
 from api.api_v1.utils.email import fm
-from core.config import settings
 from core.models import User
 from core.models.db_helper import db_helper
 from tests.integration.conftest import (
@@ -184,12 +193,9 @@ class TestAuth:
                     "email": "another_fake_email1@fakedomain.com",
                 },
             )
-            assert (
-                response.status_code == settings.exc.already_registered_exc.status_code
-            )
-            assert response.json() == {
-                "detail": settings.exc.already_registered_exc.detail
-            }
+            already_registered_exc = AlreadyRegistered()
+            assert response.status_code == already_registered_exc.status_code
+            assert response.json() == {"detail": already_registered_exc.detail}
 
         async def test_same_email(
             self,
@@ -215,12 +221,9 @@ class TestAuth:
                     "email": fourth_user_data["email"],
                 },
             )
-            assert (
-                response.status_code == settings.exc.already_registered_exc.status_code
-            )
-            assert response.json() == {
-                "detail": settings.exc.already_registered_exc.detail
-            }
+            already_registered_exc = AlreadyRegistered()
+            assert response.status_code == already_registered_exc.status_code
+            assert response.json() == {"detail": already_registered_exc.detail}
 
     class TestSendEmailVerificationToken:
         async def test_incorrect_username_or_email(
@@ -240,8 +243,9 @@ class TestAuth:
                         "password": first_user_data["password"],
                     },
                 )
+                invalid_creds_exc = InvalidCredentials()
                 assert response.status_code == 401
-                assert response.json() == {"detail": settings.exc.auth_exc.detail}
+                assert response.json() == {"detail": invalid_creds_exc.detail}
                 assert len(outbox) == 0
 
         async def test_incorrect_password(
@@ -261,8 +265,9 @@ class TestAuth:
                         "password": "incorrectpassword",
                     },
                 )
+                invalid_creds_exc = InvalidCredentials()
                 assert response.status_code == 401
-                assert response.json() == {"detail": settings.exc.auth_exc.detail}
+                assert response.json() == {"detail": invalid_creds_exc.detail}
                 assert len(outbox) == 0
 
         async def test_correct_data(
@@ -320,8 +325,13 @@ class TestAuth:
                 headers=headers,
                 data={"email_verification_token": "invalidtoken"},
             )
-            assert response.status_code == settings.exc.invalid_code_exc.status_code
-            assert response.json() == {"detail": settings.exc.invalid_code_exc.detail}
+            invalid_email_verification_code_exc = InvalidConfirmEmailCode()
+            assert (
+                response.status_code == invalid_email_verification_code_exc.status_code
+            )
+            assert response.json() == {
+                "detail": invalid_email_verification_code_exc.detail
+            }
 
         async def test_valid_email_token(
             self,
@@ -374,8 +384,13 @@ class TestAuth:
                 headers=headers,
                 data=data,
             )
-            assert response.status_code == settings.exc.invalid_code_exc.status_code
-            assert response.json() == {"detail": settings.exc.invalid_code_exc.detail}
+            invalid_email_verification_code_exc = InvalidConfirmEmailCode()
+            assert (
+                response.status_code == invalid_email_verification_code_exc.status_code
+            )
+            assert response.json() == {
+                "detail": invalid_email_verification_code_exc.detail
+            }
 
     class TestForgotPassword:
         async def test_invalid_email(
@@ -391,12 +406,9 @@ class TestAuth:
                     headers=headers,
                     data={"email": "invalid@email.com"},
                 )
-                assert (
-                    response.status_code == settings.exc.invalid_email_exc.status_code
-                )
-                assert response.json() == {
-                    "detail": settings.exc.invalid_email_exc.detail
-                }
+                invalid_email_exc = InvalidEmail()
+                assert response.status_code == invalid_email_exc.status_code
+                assert response.json() == {"detail": invalid_email_exc.detail}
                 assert len(outbox) == 0
 
         async def test_unconfirmed_email(
@@ -413,12 +425,9 @@ class TestAuth:
                     headers=headers,
                     data={"email": third_user_data["email"]},
                 )
-                assert (
-                    response.status_code == settings.exc.invalid_email_exc.status_code
-                )
-                assert response.json() == {
-                    "detail": settings.exc.invalid_email_exc.detail
-                }
+                invalid_email_exc = InvalidEmail()
+                assert response.status_code == invalid_email_exc.status_code
+                assert response.json() == {"detail": invalid_email_exc.detail}
                 assert len(outbox) == 0
 
         async def test_valid_email(
@@ -454,8 +463,9 @@ class TestAuth:
                     "forgot_password_token": "invalidtoken",
                 },
             )
-            assert response.status_code == settings.exc.invalid_code_exc.status_code
-            assert response.json() == {"detail": settings.exc.invalid_code_exc.detail}
+            invalid_change_password_code = InvalidChangePasswordCode()
+            assert response.status_code == invalid_change_password_code.status_code
+            assert response.json() == {"detail": invalid_change_password_code.detail}
 
         async def test_short_password(
             self,
@@ -555,8 +565,9 @@ class TestAuth:
                     "password": "asdf",
                 },
             )
-            assert response.status_code == settings.exc.auth_exc.status_code
-            assert response.json() == {"detail": settings.exc.auth_exc.detail}
+            invalid_creds_exc = InvalidCredentials()
+            assert response.status_code == invalid_creds_exc.status_code
+            assert response.json() == {"detail": invalid_creds_exc.detail}
 
         async def test_invalid_password(
             self,
@@ -573,8 +584,9 @@ class TestAuth:
                     "password": second_user_data["password"],
                 },
             )
-            assert response.status_code == settings.exc.auth_exc.status_code
-            assert response.json() == {"detail": settings.exc.auth_exc.detail}
+            invalid_creds_exc = InvalidCredentials()
+            assert response.status_code == invalid_creds_exc.status_code
+            assert response.json() == {"detail": invalid_creds_exc.detail}
 
         async def test_unconfirmed_email(
             self,
@@ -591,8 +603,9 @@ class TestAuth:
                     "password": third_user_data["password"],
                 },
             )
-            assert response.status_code == settings.exc.invalid_email_exc.status_code
-            assert response.json() == {"detail": settings.exc.invalid_email_exc.detail}
+            invalid_email_exc = InvalidEmail()
+            assert response.status_code == invalid_email_exc.status_code
+            assert response.json() == {"detail": invalid_email_exc.detail}
 
         async def test_correct_data(
             self,
@@ -626,8 +639,9 @@ class TestAuth:
                 url=refresh_path,
                 cookies=Cookies({"refresh_token": "incorrect-token"}),
             )
+            invalid_jwt_exc = InvalidJWT()
             assert response.status_code == 401
-            assert response.json() == {"detail": settings.exc.invalid_token_exc.detail}
+            assert response.json() == {"detail": invalid_jwt_exc.detail}
 
         async def test_incorrect_token_type(
             self,
@@ -650,12 +664,9 @@ class TestAuth:
                 url=refresh_path,
                 cookies=Cookies({"refresh_token": access_token}),
             )
-            assert (
-                response.status_code == settings.exc.invalid_token_type_exc.status_code
-            )
-            assert response.json() == {
-                "detail": settings.exc.invalid_token_type_exc.detail
-            }
+            invalid_jwt_type_exc = InvalidJWTType()
+            assert response.status_code == invalid_jwt_type_exc.status_code
+            assert response.json() == {"detail": invalid_jwt_type_exc.detail}
 
         async def test_correct_token(
             self,
@@ -753,10 +764,9 @@ class TestStory:
             async_client: AsyncClient,
         ):
             response = await async_client.get(url=f"/stories/{uuid.uuid4()}")
+            story_not_found_exc = StoryNotFound()
             assert response.status_code == 404
-            assert response.json() == {
-                "detail": settings.exc.story_not_found_exc.detail
-            }
+            assert response.json() == {"detail": story_not_found_exc.detail}
 
         async def test_get_story(
             self,
@@ -899,7 +909,6 @@ class TestStory:
             get_story_response = await async_client.get(
                 url=f"/stories/{stories_response.json()[-1]['id']}"
             )
+            story_not_found_exc = StoryNotFound()
             assert get_story_response.status_code == 404
-            assert get_story_response.json() == {
-                "detail": settings.exc.story_not_found_exc.detail
-            }
+            assert get_story_response.json() == {"detail": story_not_found_exc.detail}

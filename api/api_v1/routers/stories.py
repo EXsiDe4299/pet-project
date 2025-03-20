@@ -4,6 +4,7 @@ from starlette import status
 
 from api.api_v1.dependencies.auth import get_current_user_from_access_token
 from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
+from api.api_v1.exceptions.http_exceptions import ManageOtherStories
 from api.api_v1.schemas.story import StoryScheme, StoryInScheme
 from api.api_v1.utils.database import (
     get_stories,
@@ -113,7 +114,7 @@ async def edit_story_endpoint(
             session=session,
         )
         return edited_story
-    raise settings.exc.manage_other_story_exc
+    raise ManageOtherStories()
 
 
 @stories_router.delete(
@@ -131,7 +132,7 @@ async def delete_story_endpoint(
             session=session,
         )
         return {"status": "success"}
-    raise settings.exc.manage_other_story_exc
+    raise ManageOtherStories()
 
 
 @stories_router.post(

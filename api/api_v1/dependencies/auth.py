@@ -5,6 +5,17 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.api_v1.exceptions.http_exceptions import (
+    InvalidJWT,
+    InvalidJWTType,
+    InactiveUser,
+    InvalidEmail,
+    AlreadyRegistered,
+    InvalidConfirmEmailCode,
+    InvalidChangePasswordCode,
+    EmailAlreadyVerified,
+    InvalidCredentials,
+)
 from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
 from api.api_v1.utils.database import (
     get_user_by_email_verification_token,
@@ -35,19 +46,19 @@ async def __get_user_from_token(
     try:
         token_payload = decode_jwt(token=token)
     except InvalidTokenError:
-        raise settings.exc.invalid_token_exc
+        raise InvalidJWT()
     if not validate_token_type(token_payload=token_payload, expected_type=token_type):
-        raise settings.exc.invalid_token_type_exc
+        raise InvalidJWTType()
 
     email = token_payload.get("sub")
     user = await get_user_by_username_or_email(email=email, session=session)
     if user is None:
-        raise settings.exc.invalid_token_exc
+        raise InvalidJWT()
 
     if not user.is_active:
-        raise settings.exc.inactive_user_exc
+        raise InactiveUser()
     if not user.is_email_verified:
-        raise settings.exc.invalid_email_exc
+        raise InvalidEmail()
 
     return user
 
@@ -84,7 +95,7 @@ async def get_user_registration_data(
         session=session,
     )
     if existing_user:
-        raise settings.exc.already_registered_exc
+        raise AlreadyRegistered()
     return user_data
 
 
@@ -98,11 +109,11 @@ async def get_user_for_email_confirming(
         session=session,
     )
     if user is None:
-        raise settings.exc.invalid_code_exc
+        raise InvalidConfirmEmailCode()
     if user.is_email_verified:
-        raise settings.exc.email_already_verified_exc
+        raise EmailAlreadyVerified()
     if user.tokens.email_verification_token_exp < datetime.datetime.now():
-        raise settings.exc.invalid_code_exc
+        raise InvalidConfirmEmailCode()
 
     return user
 
@@ -117,13 +128,13 @@ async def __verify_user(
         session=session,
     )
     if user is None:
-        raise settings.exc.auth_exc
+        raise InvalidCredentials()
 
     if not verify_password(
         password=user_data.password,
         correct_password=user.hashed_password,
     ):
-        raise settings.exc.auth_exc
+        raise InvalidCredentials()
     return user
 
 
@@ -131,7 +142,7 @@ async def get_user_for_sending_email_verification_token(
     user: User = Depends(__verify_user),
 ) -> User:
     if user.is_email_verified:
-        raise settings.exc.email_already_verified_exc
+        raise EmailAlreadyVerified()
     return user
 
 
@@ -139,10 +150,10 @@ async def get_user_login_data(
     user: User = Depends(__verify_user),
 ) -> User:
     if not user.is_active:
-        raise settings.exc.inactive_user_exc
+        raise InactiveUser()
 
     if not user.is_email_verified:
-        raise settings.exc.invalid_email_exc
+        raise InvalidEmail()
 
     return user
 
@@ -156,11 +167,11 @@ async def get_user_for_sending_forgot_password_token(
         session=session,
     )
     if user is None:
-        raise settings.exc.invalid_email_exc
+        raise InvalidEmail()
     if not user.is_email_verified:
-        raise settings.exc.invalid_email_exc
+        raise InvalidEmail()
     if not user.is_active:
-        raise settings.exc.inactive_user_exc
+        raise InactiveUser()
 
     return user
 
@@ -174,12 +185,12 @@ async def get_user_for_changing_password(
         session=session,
     )
     if user is None:
-        raise settings.exc.invalid_code_exc
+        raise InvalidChangePasswordCode()
     if not user.is_email_verified:
-        raise settings.exc.invalid_email_exc
+        raise InvalidEmail()
     if not user.is_active:
-        raise settings.exc.inactive_user_exc
+        raise InactiveUser()
     if user.tokens.forgot_password_token_exp < datetime.datetime.now():
-        raise settings.exc.invalid_code_exc
+        raise InvalidChangePasswordCode()
 
     return user
