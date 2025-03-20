@@ -22,8 +22,6 @@ class Token(Base):
         nullable=True
     )
     forgot_password_token: Mapped[str] = mapped_column(nullable=True)
-    forgot_password_token_exp: Mapped[datetime.datetime] = mapped_column(
-        nullable=True
-    )
+    forgot_password_token_exp: Mapped[datetime.datetime] = mapped_column(nullable=True)
 
     __table_args__ = (UniqueConstraint("email"),)
