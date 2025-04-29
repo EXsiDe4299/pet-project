@@ -1,31 +1,38 @@
-import re
-import uuid
+import datetime
+from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from uuid import UUID
 
+import bcrypt
 import jwt
 import pytest
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from PIL import Image
+from fastapi import UploadFile
+from fastapi_mail import MessageSchema, MessageType
+from sqlalchemy import Result
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.api_v1.utils.database import (
-    create_user,
-    create_user_tokens,
-    update_user_email_verification_token,
-    update_forgot_password_token,
     get_user_by_username_or_email,
     get_user_by_email_verification_token,
     get_user_by_forgot_password_token,
+    update_user_email_verification_token,
+    update_forgot_password_token,
     change_user_password,
     confirm_user_email,
-    create_story,
     get_stories,
-    get_story_by_uuid,
-    get_author_stories,
-    edit_story,
-    like_story,
-    delete_story,
     get_stories_by_name_or_text,
+    get_story_by_uuid,
+    create_user_with_tokens,
+    get_author_stories,
+    create_story,
+    edit_story,
+    delete_story,
+    like_story,
+    update_user,
 )
+from api.api_v1.utils.email import send_plain_message_to_email
+from api.api_v1.utils.files import save_avatar, delete_avatar
 from api.api_v1.utils.jwt_auth import (
     encode_jwt,
     decode_jwt,
@@ -38,579 +45,1440 @@ from api.api_v1.utils.security import (
     verify_password,
     validate_token_type,
     generate_email_token,
+    validate_avatar_extension,
+    validate_avatar_size,
 )
 from core.config import settings
-from core.models import User, Token
-
-
-class TestSecurity:
-    def test_hash_password(self):
-        hashed_password = hash_password(password="password")
-        assert isinstance(hashed_password, bytes)
-
-    def test_verify_password(self):
-        hashed_password = hash_password(password="password")
-        assert verify_password(
-            password="password",
-            correct_password=hashed_password,
-        )
-
-    def test_verify_incorrect_password(self):
-        hashed_password = hash_password(password="password")
-        assert not verify_password(
-            password="secret",
-            correct_password=hashed_password,
-        )
-
-    def test_verify_token_type(
-        self,
-        token_data: dict,
-    ):
-        assert validate_token_type(
-            token_payload=token_data,
-            expected_type=token_data[settings.jwt_auth.token_type_payload_key],
-        )
-
-    def test_verify_invalid_token_type(
-        self,
-        token_data: dict,
-    ):
-        assert not validate_token_type(
-            token_payload=token_data,
-            expected_type="other_token_type",
-        )
-
-    def test_generate_email_token(self):
-        email_token = generate_email_token()
-        assert re.match(pattern=r"[a-z0-9]{6}", string=email_token)
-
-    def test_generate_email_token_with_arg(self):
-        email_token = generate_email_token(length=12)
-        assert re.match(pattern=r"[a-z0-9]{12}", string=email_token)
-
-
-class TestJwt:
-    def test_encode_jwt(
-        self,
-        token_data: dict,
-    ):
-        encoded = encode_jwt(payload=token_data)
-        assert isinstance(encoded, str)
-
-    def test_encode_jwt_empty_payload(self):
-        encoded = encode_jwt(payload={})
-        assert isinstance(encoded, str)
-
-    def test_encode_jwt_invalid_private_key(
-        self,
-        token_data: dict,
-    ):
-        with pytest.raises(jwt.exceptions.InvalidKeyError):
-            encode_jwt(
-                payload=token_data,
-                private_key="invalid_key",
-            )
-
-    def test_decode_jwt(
-        self,
-        token_data: dict,
-    ):
-        encoded = encode_jwt(payload=token_data)
-        decoded = decode_jwt(token=encoded)
-        assert decoded["sub"] == token_data["sub"]
-        assert decoded["username"] == token_data["username"]
-        assert (
-            decoded[settings.jwt_auth.token_type_payload_key]
-            == token_data[settings.jwt_auth.token_type_payload_key]
-        )
-
-    def test_decode_jwt_invalid_token(self):
-        invalid_token = "invalid_jwt_token"
-        with pytest.raises(jwt.exceptions.DecodeError):
-            decode_jwt(token=invalid_token)
-
-    def test_decode_jwt_expired_token(
-        self,
-        token_data: dict,
-    ):
-        encoded = encode_jwt(
-            payload=token_data,
-            expire_minutes=-1,
-        )
-        with pytest.raises(jwt.ExpiredSignatureError):
-            decode_jwt(token=encoded)
-
-    def test_decode_jwt_invalid_algorithm(
-        self,
-        token_data: dict,
-    ):
-        encoded = encode_jwt(payload=token_data)
-        with pytest.raises(jwt.InvalidAlgorithmError):
-            decode_jwt(token=encoded, algorithm="HS256")
-
-    def test_decode_jwt_invalid_public_key(
-        self,
-        token_data: dict,
-    ):
-        encoded = encode_jwt(payload=token_data)
-        with pytest.raises(jwt.exceptions.InvalidKeyError):
-            decode_jwt(token=encoded, public_key="invalid_public_key")
-
-    def test_create_jwt(
-        self,
-        token_data: dict,
-    ):
-        expire_minutes = 15
-        token = create_jwt(
-            token_type=token_data[settings.jwt_auth.token_type_payload_key],
-            token_data=token_data,
-            expire_minutes=expire_minutes,
-        )
-        decoded = decode_jwt(token=token)
-        assert decoded["sub"] == token_data["sub"]
-        assert decoded["username"] == token_data["username"]
-        assert (
-            decoded[settings.jwt_auth.token_type_payload_key]
-            == token_data[settings.jwt_auth.token_type_payload_key]
-        )
-
-    def test_create_jwt_empty_token_data(self):
-        token_data = {}
-        token_type = ""
-        expire_minutes = 15
-        token = create_jwt(
-            token_type=token_type,
-            token_data=token_data,
-            expire_minutes=expire_minutes,
-        )
-        decoded = decode_jwt(token=token)
-        assert decoded[settings.jwt_auth.token_type_payload_key] == token_type
-
-    def test_create_access_token(
-        self,
-        first_user: User,
-    ):
-        access_token = create_access_token(user=first_user)
-        decoded = decode_jwt(token=access_token)
-        assert decoded["sub"] == first_user.email
-        assert decoded["username"] == first_user.username
-        assert (
-            decoded[settings.jwt_auth.token_type_payload_key]
-            == settings.jwt_auth.access_token_type
-        )
-
-    def test_create_refresh_token(
-        self,
-        first_user: User,
-    ):
-        access_token = create_refresh_token(user=first_user)
-        decoded = decode_jwt(token=access_token)
-        assert decoded["sub"] == first_user.email
-        assert (
-            decoded[settings.jwt_auth.token_type_payload_key]
-            == settings.jwt_auth.refresh_token_type
-        )
+from core.models import User, Token, Story
 
 
 @pytest.mark.anyio
 class TestDatabase:
-    async def test_create_user(
-        self,
-        session: AsyncSession,
-        first_user: User,
-    ):
-        hashed_password = hash_password("password")
-        new_user = await create_user(
-            username=first_user.username,
-            email=first_user.email,
-            hashed_password=hashed_password,
-            session=session,
-        )
-        assert new_user.username == first_user.username
-        assert new_user.email == first_user.email
-        assert new_user.hashed_password == hashed_password
+    class TestGetUserByUsernameOrEmail:
+        async def test_existent_email_and_username(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            email = "test@example.com"
+            username = "username"
+            mock_user = User(
+                username=username,
+                email=email,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_db_session.execute.return_value = mock_result
 
-    async def test_create_user2(
-        self,
-        session: AsyncSession,
-        second_user: User,
-    ):
-        hashed_password = hash_password("password")
-        new_user = await create_user(
-            username=second_user.username,
-            email=second_user.email,
-            hashed_password=hashed_password,
-            session=session,
-        )
-        assert new_user.username == second_user.username
-        assert new_user.email == second_user.email
-        assert new_user.hashed_password == hashed_password
-
-    async def test_create_user_same_username(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        with pytest.raises(IntegrityError):
-            await create_user(
-                username=first_user.username,
-                email="other_email@email.com",
-                hashed_password=first_user.hashed_password,
-                session=session,
+            user = await get_user_by_username_or_email(
+                username=username,
+                email=email,
+                session=mock_db_session,
             )
 
-    async def test_create_user_same_email(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        with pytest.raises(IntegrityError):
-            await create_user(
-                username="other_username",
-                email=first_user.email,
-                hashed_password=first_user.hashed_password,
-                session=session,
+            mock_db_session.execute.assert_awaited_once()
+            assert user == mock_user
+
+        async def test_nonexistent_email_and_username(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db_session.execute.return_value = mock_result
+
+            user = await get_user_by_username_or_email(
+                username="nonexistent",
+                email="nonexistent@example.com",
+                session=mock_db_session,
             )
 
-    async def test_create_user_tokens(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        tokens = await create_user_tokens(email=first_user.email, session=session)
-        assert tokens.email == first_user.email
+            mock_db_session.execute.assert_awaited_once()
+            assert user is None
 
-    async def test_create_user_tokens_existing_email(
-        self,
-        second_user: User,
-        session: AsyncSession,
-    ):
-        await create_user_tokens(email=second_user.email, session=session)
-        with pytest.raises(IntegrityError):
-            await create_user_tokens(email=second_user.email, session=session)
+        async def test_username_only(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            email = "test@example.com"
+            username = "username"
+            mock_user = User(
+                username=username,
+                email=email,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_db_session.execute.return_value = mock_result
 
-    async def test_create_user_tokens_nonexistent_email(
-        self,
-        session: AsyncSession,
-    ):
-        with pytest.raises(IntegrityError):
-            await create_user_tokens(email="nonexistent_email", session=session)
-
-    async def test_update_user_email_verification_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        stmt = select(Token).where(Token.email == first_user.email)
-        user_tokens = await session.execute(stmt)
-        user_tokens = user_tokens.scalar_one()
-        tokens = await update_user_email_verification_token(
-            user_tokens=user_tokens,
-            email_verification_token=first_user.tokens.email_verification_token,
-            session=session,
-        )
-        assert tokens.email == first_user.email
-        assert (
-            tokens.email_verification_token
-            == first_user.tokens.email_verification_token
-        )
-
-    async def test_update_forgot_password_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        stmt = select(Token).where(Token.email == first_user.email)
-        user_tokens = await session.execute(stmt)
-        user_tokens = user_tokens.scalar_one()
-        tokens = await update_forgot_password_token(
-            user_tokens=user_tokens,
-            forgot_password_token=first_user.tokens.forgot_password_token,
-            session=session,
-        )
-        assert tokens.email == first_user.email
-        assert tokens.forgot_password_token == first_user.tokens.forgot_password_token
-
-    async def test_get_user_by_username(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_username_or_email(
-            username=first_user.username,
-            session=session,
-        )
-        assert user.email == first_user.email
-        assert user.username == first_user.username
-
-    async def test_get_user_by_email(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_username_or_email(
-            email=first_user.email,
-            session=session,
-        )
-        assert user.email == first_user.email
-        assert user.username == first_user.username
-
-    async def test_get_user_by_invalid_username(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_username_or_email(
-            username="invalid_username",
-            session=session,
-        )
-        assert user is None
-
-    async def test_get_user_by_invalid_email(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_username_or_email(
-            email="invalid_email",
-            session=session,
-        )
-        assert user is None
-
-    async def test_get_user_by_email_verification_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_email_verification_token(
-            email_verification_token=first_user.tokens.email_verification_token,
-            session=session,
-        )
-        assert user.email == first_user.email
-        assert user.username == first_user.username
-
-    async def test_get_user_by_forgot_password_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_forgot_password_token(
-            forgot_password_token=first_user.tokens.forgot_password_token,
-            session=session,
-        )
-        assert user.email == first_user.email
-        assert user.username == first_user.username
-
-    async def test_get_user_by_invalid_email_verification_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_email_verification_token(
-            email_verification_token="invalid_token",
-            session=session,
-        )
-        assert user is None
-
-    async def test_get_user_by_invalid_forgot_password_token(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        user = await get_user_by_forgot_password_token(
-            forgot_password_token="invalid_token",
-            session=session,
-        )
-        assert user is None
-
-    async def test_change_password(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        first_user = await get_user_by_username_or_email(
-            username=first_user.username,
-            session=session,
-        )
-        new_hashed_password = hash_password(password="new_password")
-        user = await change_user_password(
-            user=first_user,
-            new_hashed_password=new_hashed_password,
-            session=session,
-        )
-        assert user.hashed_password == new_hashed_password
-
-    async def test_confirm_user_email(
-        self,
-        first_user: User,
-        session: AsyncSession,
-    ):
-        first_user = await get_user_by_username_or_email(
-            username=first_user.username,
-            session=session,
-        )
-        assert not first_user.is_email_verified
-        await confirm_user_email(user=first_user, session=session)
-        assert first_user.is_email_verified
-
-    async def test_create_story_nonexistent_author(
-        self,
-        session: AsyncSession,
-    ):
-        with pytest.raises(IntegrityError):
-            await create_story(
-                name="test story name",
-                text="test story text",
-                author_email="nonexistent@email.com",
-                session=session,
+            user = await get_user_by_username_or_email(
+                username=username,
+                session=mock_db_session,
             )
 
-    @pytest.mark.parametrize(
-        "name,text",
-        (
-            ("first test story name", "first test story text"),
-            ("second test story name", "second test story text"),
-        ),
-    )
-    async def test_create_story_success(
-        self,
-        first_user: User,
-        session: AsyncSession,
-        name: str,
-        text: str,
-    ):
-        story = await create_story(
-            name=name,
-            text=text,
-            author_email=first_user.email,
-            session=session,
-        )
-        assert story.name == name
-        assert story.text == text
-        assert story.author_email == first_user.email
+            mock_db_session.execute.assert_awaited_once()
+            assert user == mock_user
 
-    async def test_get_stories(
-        self,
-        session: AsyncSession,
-    ):
-        stories = await get_stories(session=session)
-        assert len(stories) == 2
+        async def test_email_only(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            email = "test@example.com"
+            username = "username"
+            mock_user = User(
+                username=username,
+                email=email,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_db_session.execute.return_value = mock_result
 
-    async def test_get_story_by_invalid_uuid(
-        self,
-        session: AsyncSession,
-    ):
-        story = await get_story_by_uuid(
-            story_uuid=uuid.uuid4(),
-            session=session,
-        )
-        assert story is None
+            user = await get_user_by_username_or_email(
+                email=email,
+                session=mock_db_session,
+            )
 
-    async def test_get_story_by_uuid(
-        self,
-        session: AsyncSession,
-    ):
-        stories = await get_stories(session=session)
-        story = await get_story_by_uuid(
-            story_uuid=stories[0].id,
-            session=session,
-        )
-        assert story is not None
+            mock_db_session.execute.assert_awaited_once()
+            assert user == mock_user
 
-    async def test_get_author_stories_nonexistent(
-        self,
-        session: AsyncSession,
-    ):
-        stories = await get_author_stories(
-            author_username="nonexistent",
-            session=session,
-        )
-        assert len(stories) == 0
+        async def test_without_email_and_username(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db_session.execute.return_value = mock_result
 
-    async def test_get_author_stories(
-        self,
-        session: AsyncSession,
-        first_user: User,
-    ):
-        stories = await get_author_stories(
-            author_username=first_user.username,
-            session=session,
-        )
-        assert len(stories) == 2
+            user = await get_user_by_username_or_email(session=mock_db_session)
 
-    async def test_get_stories_by_name_or_text_nonexistent(
-        self,
-        session: AsyncSession,
-    ):
-        stories = await get_stories_by_name_or_text(
-            query="nonexistent",
-            session=session,
-        )
-        assert len(stories) == 0
+            mock_db_session.execute.assert_awaited_once()
+            assert user is None
 
-    async def test_get_stories_by_name_or_text(
-        self,
-        session: AsyncSession,
-    ):
-        stories = await get_stories_by_name_or_text(
-            query="story",
-            session=session,
-        )
-        assert len(stories) == 2
+    class TestGetUserByEmailVerificationToken:
+        async def test_existent_token(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            token = "valid_token"
+            mock_user = User(
+                tokens=Token(
+                    email_verification_token=token,
+                ),
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_db_session.execute.return_value = mock_result
 
-    async def test_edit_story(
-        self,
-        session: AsyncSession,
-        first_user: User,
-    ):
-        stories = await get_author_stories(
-            author_username=first_user.username,
-            session=session,
-        )
-        story = stories[0]
-        edited_story = await edit_story(
-            name="edited test story name",
-            text="edited test story text",
-            story=story,
-            session=session,
-        )
-        story_with_changes = await get_story_by_uuid(
-            story_uuid=story.id,
-            session=session,
-        )
-        assert edited_story.name == story_with_changes.name
-        assert edited_story.text == story_with_changes.text
+            user = await get_user_by_email_verification_token(
+                email_verification_token=token,
+                session=mock_db_session,
+            )
 
-    async def test_like_story(
-        self,
-        session: AsyncSession,
-        first_user: User,
-    ):
-        stories = await get_author_stories(
-            author_username=first_user.username,
-            session=session,
-        )
-        story = stories[0]
-        await like_story(story=story, user=story.author, session=session)
-        liked_story = await get_story_by_uuid(
-            story_uuid=story.id,
-            session=session,
-        )
-        assert liked_story.likes_number == 1
+            mock_db_session.execute.assert_awaited_once()
+            assert user == mock_user
 
-    async def test_delete_story(
-        self,
-        session: AsyncSession,
-        first_user: User,
-    ):
-        stories = await get_author_stories(
-            author_username=first_user.username,
-            session=session,
-        )
-        story = stories[0]
-        await delete_story(story=story, session=session)
-        deleted_story = await get_story_by_uuid(
-            story_uuid=story.id,
-            session=session,
-        )
-        assert deleted_story is None
+        async def test_nonexistent_token(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            token = "nonexistent_token"
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db_session.execute.return_value = mock_result
+
+            user = await get_user_by_email_verification_token(
+                email_verification_token=token,
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert user is None
+
+    class TestGetUserByForgotPasswordToken:
+        async def test_existent_token(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            token = "valid_token"
+            mock_user = User(
+                tokens=Token(
+                    forgot_password_token=token,
+                ),
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_user
+            mock_db_session.execute.return_value = mock_result
+
+            user = await get_user_by_forgot_password_token(
+                forgot_password_token=token,
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert user == mock_user
+
+        async def test_nonexistent_token(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            token = "nonexistent_token"
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db_session.execute.return_value = mock_result
+
+            user = await get_user_by_forgot_password_token(
+                forgot_password_token=token,
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert user is None
+
+    class TestCreateUserWithTokens:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "username"
+            hashed_password = b"password"
+            email = "test@example.com"
+
+            await create_user_with_tokens(
+                email=email,
+                username=username,
+                hashed_password=hashed_password,
+                session=mock_db_session,
+            )
+
+            mock_db_session.add.assert_called()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            added_user = mock_db_session.add.call_args_list[0].args[0]
+            added_tokens = mock_db_session.add.call_args_list[1].args[0]
+
+            assert isinstance(added_user, User)
+            assert isinstance(added_tokens, Token)
+            assert added_user.email == email
+            assert added_user.hashed_password == hashed_password
+            assert added_user.username == username
+            assert added_tokens.email == email
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "username"
+            hashed_password = b"password"
+            email = "test@example.com"
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await create_user_with_tokens(
+                    email=email,
+                    username=username,
+                    hashed_password=hashed_password,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.add.assert_called()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestUpdateUserEmailVerificationToken:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            user_tokens = Token()
+            email_verification_token = "new_email_verification_token"
+            expire_minutes = 5
+
+            updated_tokens = await update_user_email_verification_token(
+                user_tokens=user_tokens,
+                email_verification_token=email_verification_token,
+                expire_minutes=expire_minutes,
+                session=mock_db_session,
+            )
+
+            assert isinstance(updated_tokens, Token)
+            assert updated_tokens.email_verification_token == email_verification_token
+            expected_expiration = datetime.datetime.now() + datetime.timedelta(
+                minutes=expire_minutes
+            )
+            expiration_time_diff = abs(
+                (
+                    updated_tokens.email_verification_token_exp - expected_expiration
+                ).total_seconds()
+            )
+            assert expiration_time_diff < 10
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            user_tokens = Token()
+            email_verification_token = "new_email_verification_token"
+            expire_minutes = 5
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await update_user_email_verification_token(
+                    user_tokens=user_tokens,
+                    email_verification_token=email_verification_token,
+                    expire_minutes=expire_minutes,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+
+    class TestUpdateForgotPasswordToken:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            user_tokens = Token()
+            forgot_password_token = "new_forgot_password_token"
+            expire_minutes = 5
+
+            updated_tokens = await update_forgot_password_token(
+                user_tokens=user_tokens,
+                forgot_password_token=forgot_password_token,
+                expire_minutes=expire_minutes,
+                session=mock_db_session,
+            )
+
+            assert isinstance(updated_tokens, Token)
+            assert updated_tokens.forgot_password_token == forgot_password_token
+            expected_expiration = datetime.datetime.now() + datetime.timedelta(
+                minutes=expire_minutes
+            )
+            expiration_time_diff = abs(
+                (
+                    updated_tokens.forgot_password_token_exp - expected_expiration
+                ).total_seconds()
+            )
+            assert expiration_time_diff < 10
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            user_tokens = Token()
+            forgot_password_token = "new_forgot_password_token"
+            expire_minutes = 5
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await update_forgot_password_token(
+                    user_tokens=user_tokens,
+                    forgot_password_token=forgot_password_token,
+                    expire_minutes=expire_minutes,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+
+    class TestChangeUserPassword:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            hashed_password = b"password"
+            new_hashed_password = b"new_password"
+            forgot_password_token = "forgot_password_token"
+            forgot_password_token_exp = datetime.datetime.now(datetime.UTC)
+            mock_user = User(
+                hashed_password=hashed_password,
+                tokens=Token(
+                    forgot_password_token=forgot_password_token,
+                    forgot_password_token_exp=forgot_password_token_exp,
+                ),
+            )
+
+            changed_user = await change_user_password(
+                user=mock_user,
+                new_hashed_password=new_hashed_password,
+                session=mock_db_session,
+            )
+
+            assert isinstance(changed_user, User)
+            assert changed_user.hashed_password == new_hashed_password
+            assert changed_user.tokens.forgot_password_token is None
+            assert changed_user.tokens.forgot_password_token_exp is None
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            hashed_password = b"password"
+            new_hashed_password = b"new_password"
+            forgot_password_token = "forgot_password_token"
+            forgot_password_token_exp = datetime.datetime.now(datetime.UTC)
+            mock_user = User(
+                hashed_password=hashed_password,
+                tokens=Token(
+                    forgot_password_token=forgot_password_token,
+                    forgot_password_token_exp=forgot_password_token_exp,
+                ),
+            )
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await change_user_password(
+                    user=mock_user,
+                    new_hashed_password=new_hashed_password,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+
+    class TestConfirmUserEmail:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            email_verification_token = "email_verification_token"
+            email_verification_token_exp = datetime.datetime.now(datetime.UTC)
+            mock_user = User(
+                is_email_verified=False,
+                tokens=Token(
+                    email_verification_token=email_verification_token,
+                    email_verification_token_exp=email_verification_token_exp,
+                ),
+            )
+
+            await confirm_user_email(user=mock_user, session=mock_db_session)
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            email_verification_token = "email_verification_token"
+            email_verification_token_exp = datetime.datetime.now(datetime.UTC)
+            mock_user = User(
+                is_email_verified=False,
+                tokens=Token(
+                    email_verification_token=email_verification_token,
+                    email_verification_token_exp=email_verification_token_exp,
+                ),
+            )
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await confirm_user_email(user=mock_user, session=mock_db_session)
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestGetStories:
+        async def test_some_stories(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story1 = Story(name="story 1")
+            mock_story2 = Story(name="story 2")
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_story1,
+                mock_story2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories(session=mock_db_session)
+
+            assert len(stories) == 2
+            assert stories[0].name == mock_story1.name
+            assert stories[1].name == mock_story2.name
+            mock_db_session.execute.assert_awaited_once()
+
+        async def test_empty_result(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories(session=mock_db_session)
+
+            assert len(stories) == 0
+            mock_db_session.execute.assert_awaited_once()
+
+    class TestGetStoriesByNameOrText:
+        async def test_empty_result(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories_by_name_or_text(
+                query="nonexistent",
+                session=mock_db_session,
+            )
+
+            assert len(stories) == 0
+            mock_db_session.execute.assert_awaited_once()
+
+        async def test_by_name(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story1 = Story(name="story 1 name")
+            mock_story2 = Story(name="story 2 name")
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_story1,
+                mock_story2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories_by_name_or_text(
+                query="story",
+                session=mock_db_session,
+            )
+
+            assert len(stories) == 2
+            assert stories[0].name == mock_story1.name
+            assert stories[1].name == mock_story2.name
+            mock_db_session.execute.assert_awaited_once()
+
+        async def test_by_text(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story1 = Story(text="story 1 text")
+            mock_story2 = Story(text="story 2 text")
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_story1,
+                mock_story2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories_by_name_or_text(
+                query="story",
+                session=mock_db_session,
+            )
+
+            assert len(stories) == 2
+            assert stories[0].name == mock_story1.name
+            assert stories[1].name == mock_story2.name
+            mock_db_session.execute.assert_awaited_once()
+
+        async def test_by_name_and_text(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story1 = Story(name="test story 1 name", text="story 1 text")
+            mock_story2 = Story(name="story 2 name", text="test story 2 text")
+            mock_story3 = Story(name="story 3 name", text="test story 3 text")
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_story1,
+                mock_story2,
+                mock_story3,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_stories_by_name_or_text(
+                query="test",
+                session=mock_db_session,
+            )
+
+            assert len(stories) == 3
+            assert stories[0].name == mock_story1.name
+            assert stories[0].text == mock_story1.text
+            assert stories[1].name == mock_story2.name
+            assert stories[1].text == mock_story2.text
+            assert stories[2].name == mock_story3.name
+            assert stories[2].text == mock_story3.text
+            mock_db_session.execute.assert_awaited_once()
+
+    class TestGetStoryByUuid:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
+            mock_story = Story(id=story_id)
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = mock_story
+            mock_db_session.execute.return_value = mock_result
+
+            story = await get_story_by_uuid(
+                story_uuid=story_id,
+                session=mock_db_session,
+            )
+            mock_db_session.execute.assert_awaited_once()
+            assert story.id == story_id
+
+        async def test_not_found(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalar_one_or_none.return_value = None
+            mock_db_session.execute.return_value = mock_result
+
+            story = await get_story_by_uuid(
+                story_uuid=story_id,
+                session=mock_db_session,
+            )
+            mock_db_session.execute.assert_awaited_once()
+            assert story is None
+
+    class TestGetAuthorStories:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            author_email = "test@example.com"
+            username = "username"
+            author = User(
+                email=author_email,
+                username=username,
+            )
+            mock_story1 = Story(
+                author_email=author_email,
+                author=author,
+            )
+            mock_story2 = Story(
+                author_email=author_email,
+                author=author,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_story1,
+                mock_story2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_author_stories(
+                author_username=username,
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(stories) == 2
+            assert stories[0].author_email == author_email
+            assert stories[0].author.email == author_email
+            assert stories[0].author.username == username
+            assert stories[1].author_email == author_email
+            assert stories[1].author.email == author_email
+            assert stories[1].author.username == username
+
+        async def test_empty_result(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "nonexistent"
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_db_session.execute.return_value = mock_result
+
+            stories = await get_author_stories(
+                author_username=username,
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(stories) == 0
+
+    class TestCreateStory:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            name = "Test story name"
+            text = "Test story text"
+            author_email = "test@example.com"
+
+            added_story = await create_story(
+                name=name,
+                text=text,
+                author_email=author_email,
+                session=mock_db_session,
+            )
+
+            mock_db_session.add.assert_called()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(added_story, Story)
+            assert added_story.name == name
+            assert added_story.text == text
+            assert added_story.author_email == author_email
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            name = "Test story name"
+            text = "Test story text"
+            author_email = "test@example.com"
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await create_story(
+                    name=name,
+                    text=text,
+                    author_email=author_email,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.add.assert_called()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestEditStory:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story = Story(
+                name="Test story name",
+                text="Test story text",
+            )
+            new_story_name = "New test story name"
+            new_story_text = "New test story text"
+
+            edited_story = await edit_story(
+                name=new_story_name,
+                text=new_story_text,
+                story=mock_story,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(edited_story, Story)
+            assert edited_story.name == new_story_name
+            assert edited_story.text == new_story_text
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story = Story(
+                name="Test story name",
+                text="Test story text",
+            )
+            new_story_name = "New test story name"
+            new_story_text = "New test story text"
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await edit_story(
+                    name=new_story_name,
+                    text=new_story_text,
+                    story=mock_story,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+
+    class TestDeleteStory:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            name = "Test story name"
+            text = "Test story text"
+            mock_story = Story(
+                name=name,
+                text=text,
+            )
+
+            await delete_story(story=mock_story, session=mock_db_session)
+
+            mock_db_session.delete.assert_awaited_once()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            deleted_story: Story = mock_db_session.delete.call_args[0][0]
+
+            assert deleted_story.name == name
+            assert deleted_story.text == text
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_story = Story(
+                name="Test story name",
+                text="Test story text",
+            )
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await delete_story(story=mock_story, session=mock_db_session)
+
+            mock_db_session.delete.assert_awaited_once()
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestLikeStory:
+        async def test_like(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "username"
+            story_name = "Test story name"
+            mock_user = User(
+                username=username,
+                liked_stories=[],
+            )
+            mock_story = Story(
+                name=story_name,
+                likes_number=0,
+                likers=[],
+            )
+
+            await like_story(
+                story=mock_story,
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+            assert mock_story.likes_number == 1
+            assert len(mock_story.likers) == 1
+            assert mock_story.likers[0].username == mock_user.username
+            assert len(mock_user.liked_stories) == 1
+            assert mock_user.liked_stories[0].name == story_name
+
+        async def test_unlike(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "username"
+            mock_user = User(
+                username=username,
+            )
+            mock_story = Story(
+                likes_number=1,
+            )
+            mock_user.liked_stories = [mock_story]
+            mock_story.likers = [mock_user]
+
+            await like_story(
+                story=mock_story,
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+            assert mock_story.likes_number == 0
+            assert len(mock_story.likers) == 0
+            assert len(mock_user.liked_stories) == 0
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            username = "username"
+            story_name = "Test story name"
+            mock_user = User(
+                username=username,
+                liked_stories=[],
+            )
+            mock_story = Story(
+                name=story_name,
+                likes_number=0,
+                likers=[],
+            )
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await like_story(
+                    story=mock_story,
+                    user=mock_user,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestUpdateUser:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(
+                bio="Test biography",
+                avatar_name="testavatar.jpg",
+            )
+            new_bio = "New test biography"
+            new_avatar_name = "newtestavatar.jpg"
+
+            updated_user = await update_user(
+                bio=new_bio,
+                avatar_name=new_avatar_name,
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(updated_user, User)
+            assert updated_user.bio == new_bio
+            assert updated_user.avatar_name == new_avatar_name
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(
+                bio="Test biography",
+                avatar_name="testavatar.jpg",
+            )
+            new_bio = "New test biography"
+            new_avatar_name = "newtestavatar.jpg"
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await update_user(
+                    bio=new_bio,
+                    avatar_name=new_avatar_name,
+                    user=mock_user,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.rollback.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+
+
+class TestEmail:
+    class TestSendPlainMessage:
+        def test_success(
+            self,
+            mock_background_tasks: Mock,
+            mock_fastmail: MagicMock,
+        ):
+            subject = "Test subject"
+            email_address = "test@example.com"
+            body = "Test message"
+
+            send_plain_message_to_email(
+                subject=subject,
+                email_address=email_address,
+                body=body,
+                background_tasks=mock_background_tasks,
+            )
+
+            mock_background_tasks.add_task.assert_called_once()
+            args = mock_background_tasks.add_task.call_args[0]
+            assert args[0] == mock_fastmail.send_message
+            message = args[1]
+            assert isinstance(message, MessageSchema)
+            assert message.subject == subject
+            assert message.recipients == [email_address]
+            assert message.body == body
+            assert message.subtype == MessageType.plain
+            assert args[2] is None
+
+
+@pytest.mark.anyio
+class TestFiles:
+    class TestSaveAvatar:
+        async def test_success(self):
+            mock_avatar = MagicMock(spec=UploadFile)
+            mock_avatar.filename = "test.png"
+            mock_avatar.read.return_value = b"test data"
+            username = "username"
+            avatar_name = "username.png"
+            # сделай фикстуру mock_file...
+            mock_file = AsyncMock()
+            mock_file.__aenter__.return_value = mock_file
+            mock_file.__aexit__.return_value = None
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.open", return_value=mock_file) as mock_aiofiles_open:
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
+
+                    result = await save_avatar(mock_avatar, username)
+
+                    assert result == avatar_name
+                    mock_avatar.read.assert_awaited_once()
+                    mock_file.write.assert_awaited_once_with(b"test data")
+                    mock_exists.assert_not_awaited()
+                    mock_aiofiles_open.assert_called_once()
+
+        async def test_with_exception_and_delete(self):
+            mock_avatar = MagicMock(spec=UploadFile)
+            mock_avatar.filename = "test.png"
+            mock_avatar.read.side_effect = OSError("Test error")
+            username = "username"
+            # сделай фикстуру mock_file...
+            mock_file = AsyncMock()
+            mock_file.__aenter__.return_value = mock_file
+            mock_file.__aexit__.return_value = None
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.open", return_value=mock_file):
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
+                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
+
+                        with pytest.raises(OSError, match="Test error"):
+                            await save_avatar(mock_avatar, username)
+
+                        mock_exists.assert_called_once()
+                        mock_delete.assert_called_once_with("username.png")
+
+        async def test_with_exception_no_delete(self):
+            mock_avatar = MagicMock(spec=UploadFile)
+            mock_avatar.filename = "test.png"
+            mock_avatar.read.side_effect = OSError("Test error")
+            username = "username"
+            # сделай фикстуру mock_file...
+            mock_file = AsyncMock()
+            mock_file.__aenter__.return_value = mock_file
+            mock_file.__aexit__.return_value = None
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.open", return_value=mock_file):
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
+                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
+
+                        with pytest.raises(OSError, match="Test error"):
+                            await save_avatar(mock_avatar, username)
+
+                        mock_exists.assert_called_once()
+                        mock_delete.assert_not_called()
+
+    class TestDeleteAvatar:
+        async def test_success(self):
+            avatar_name = "test.png"
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
+                with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove: # fmt: skip
+
+                    await delete_avatar(avatar_name=avatar_name)
+
+                    expected_path = settings.avatar.avatars_dir / avatar_name
+                    mock_exists.assert_awaited_once_with(expected_path)
+                    mock_remove.assert_awaited_once_with(expected_path)
+
+        async def test_file_not_found(self):
+            avatar_name = "nonexistent.png"
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists:  # fmt: skip
+                with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove:  # fmt: skip
+
+                    await delete_avatar(avatar_name=avatar_name)
+
+                    expected_path = settings.avatar.avatars_dir / avatar_name
+                    mock_exists.assert_awaited_once_with(expected_path)
+                    mock_remove.assert_not_awaited()
+
+        async def test_with_exception_no_delete(self):
+            avatar_name = "test.png"
+            # сделай фикстуры хотя бы пэтчей!!!
+            with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists:  # fmt: skip
+                with patch("aiofiles.os.remove", new_callable=AsyncMock, side_effect=OSError("Test error")) as mock_remove:  # fmt: skip
+
+                    with pytest.raises(OSError, match="Test error"):
+                        await delete_avatar(avatar_name)
+
+                    expected_path = settings.avatar.avatars_dir / avatar_name
+                    mock_exists.assert_awaited_once_with(expected_path)
+                    mock_remove.assert_awaited_once_with(expected_path)
+
+
+class TestJWTAuth:
+    class TestEncodeJWT:
+        def test_success(self, mock_datetime_now):
+            payload = {"sub": 123}
+            private_key = "test_private_key"
+            algorithm = "RS256"
+            expire_minutes = 30
+
+            expected_result = "encoded_token"
+            expected_exp = mock_datetime_now + datetime.timedelta(minutes=expire_minutes) # fmt: skip
+            expected_payload = payload.copy()
+            expected_payload.update(exp=expected_exp, iat=mock_datetime_now)
+
+            with patch("jwt.encode", return_value=expected_result) as mock_jwt_encode:
+                result = encode_jwt(
+                    payload=payload,
+                    private_key=private_key,
+                    algorithm=algorithm,
+                    expire_minutes=expire_minutes,
+                )
+
+                mock_jwt_encode.assert_called_once_with(
+                    payload=expected_payload,
+                    key=private_key,
+                    algorithm=algorithm,
+                )
+                assert result == expected_result
+
+        def test_expire_minutes_zero(self, mock_datetime_now):
+            payload = {"sub": 123}
+
+            with patch("jwt.encode") as mock_jwt_encode:
+                encode_jwt(payload=payload, expire_minutes=0)
+
+                expected_payload = payload.copy()
+                expected_payload.update(exp=mock_datetime_now, iat=mock_datetime_now)
+                kwargs = mock_jwt_encode.call_args[1]
+                assert kwargs["payload"] == expected_payload
+
+        def test_with_exception(self, mock_datetime_now):
+            payload = {"sub": 123}
+
+            with patch('jwt.encode', side_effect=jwt.PyJWTError('Test error')) as mock_jwt_encode: # fmt: skip
+                with pytest.raises(jwt.PyJWTError, match="Test error"):
+                    encode_jwt(payload=payload)
+
+            expected_payload = payload.copy()
+            expected_expire_minutes = mock_datetime_now + datetime.timedelta(
+                minutes=settings.jwt_auth.access_token_expire_minutes
+            )
+            expected_payload.update(
+                exp=expected_expire_minutes,
+                iat=mock_datetime_now,
+            )
+            mock_jwt_encode.assert_called_once_with(
+                payload=expected_payload,
+                key=settings.jwt_auth.private_key_path.read_text(),
+                algorithm=settings.jwt_auth.algorithm,
+            )
+
+    class TestDecodeJWT:
+        def test_success(self):
+            token = "valid token"
+            public_key = "test_public_key"
+            algorithm = "RS256"
+            expected_result = {"sub": 123}
+
+            with patch("jwt.decode", return_value=expected_result) as mock_jwt_decode:
+                result = decode_jwt(
+                    token=token,
+                    public_key=public_key,
+                    algorithm=algorithm,
+                )
+
+                mock_jwt_decode.assert_called_once_with(
+                    jwt=token,
+                    key=public_key,
+                    algorithms=[algorithm],
+                )
+                assert result == expected_result
+
+        def test_invalid_token(self):
+            token = "invalid token"
+            public_key = "test_public_key"
+            algorithm = "RS256"
+
+            with patch("jwt.decode", side_effect=jwt.InvalidTokenError('Test error')) as mock_jwt_decode: # fmt: skip
+                with pytest.raises(jwt.InvalidTokenError, match="Test error"):
+                    decode_jwt(
+                        token=token,
+                        public_key=public_key,
+                        algorithm=algorithm,
+                    )
+
+                mock_jwt_decode.assert_called_once_with(
+                    jwt=token,
+                    key=public_key,
+                    algorithms=[algorithm],
+                )
+
+        def test_expired_token(self):
+            token = "expired token"
+            public_key = "test_public_key"
+            algorithm = "RS256"
+
+            with patch("jwt.decode", side_effect=jwt.ExpiredSignatureError('Test error')) as mock_jwt_decode: # fmt: skip
+                with pytest.raises(jwt.ExpiredSignatureError, match="Test error"):
+                    decode_jwt(
+                        token=token,
+                        public_key=public_key,
+                        algorithm=algorithm,
+                    )
+
+                mock_jwt_decode.assert_called_once_with(
+                    jwt=token,
+                    key=public_key,
+                    algorithms=[algorithm],
+                )
+
+    class TestCreateJWT:
+        def test_success(self):
+            token_type = "access"
+            token_data = {"sub": 123}
+            expire_minutes = 30
+            expected_payload = token_data.copy()
+            expected_payload.update(
+                {
+                    settings.jwt_auth.token_type_payload_key: token_type,
+                }
+            )
+            expected_result = "encoded_token"
+
+            with patch("api.api_v1.utils.jwt_auth.encode_jwt", return_value=expected_result) as mock_encode_jwt: # fmt: skip
+                result = create_jwt(
+                    token_type=token_type,
+                    token_data=token_data,
+                    expire_minutes=expire_minutes,
+                )
+
+                mock_encode_jwt.assert_called_once_with(
+                    payload=expected_payload,
+                    expire_minutes=expire_minutes,
+                )
+                assert result == expected_result
+
+        def test_with_exception(self):
+            token_type = "access"
+            token_data = {"sub": 123}
+            expire_minutes = 30
+            expected_payload = token_data.copy()
+            expected_payload.update(
+                {
+                    settings.jwt_auth.token_type_payload_key: token_type,
+                }
+            )
+
+            with patch("api.api_v1.utils.jwt_auth.encode_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_encode_jwt: # fmt: skip
+                with pytest.raises(jwt.PyJWTError, match="Test error"):
+                    create_jwt(
+                        token_type=token_type,
+                        token_data=token_data,
+                        expire_minutes=expire_minutes,
+                    )
+
+                mock_encode_jwt.assert_called_once_with(
+                    payload=expected_payload,
+                    expire_minutes=expire_minutes,
+                )
+
+    class TestCreateAccessToken:
+        def test_success(self):
+            user = User(
+                email="test@example.com",
+                username="username",
+            )
+            expected_payload = {
+                "sub": user.email,
+                "username": user.username,
+            }
+            expected_result = "encoded_access_token"
+
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", return_value=expected_result) as mock_create_jwt: # fmt: skip
+                result = create_access_token(user=user)
+
+                mock_create_jwt.assert_called_once_with(
+                    token_type=settings.jwt_auth.access_token_type,
+                    token_data=expected_payload,
+                    expire_minutes=settings.jwt_auth.access_token_expire_minutes,
+                )
+                assert result == expected_result
+
+        def test_with_exception(self):
+            user = User(
+                email="test@example.com",
+                username="username",
+            )
+            expected_payload = {
+                "sub": user.email,
+                "username": user.username,
+            }
+
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt: # fmt: skip
+                with pytest.raises(jwt.PyJWTError, match="Test error"):
+                    create_access_token(user=user)
+
+            mock_create_jwt.assert_called_once_with(
+                token_type=settings.jwt_auth.access_token_type,
+                token_data=expected_payload,
+                expire_minutes=settings.jwt_auth.access_token_expire_minutes,
+            )
+
+    class TestCreateRefreshToken:
+        def test_success(self):
+            user = User(
+                email="test@example.com",
+            )
+            expected_payload = {
+                "sub": user.email,
+            }
+            expected_result = "encoded_refresh_token"
+
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", return_value=expected_result) as mock_create_jwt:  # fmt: skip
+                result = create_refresh_token(user=user)
+
+                mock_create_jwt.assert_called_once_with(
+                    token_type=settings.jwt_auth.refresh_token_type,
+                    token_data=expected_payload,
+                    expire_minutes=settings.jwt_auth.refresh_token_expire_minutes,
+                )
+                assert result == expected_result
+
+        def test_with_exception(self):
+            user = User(
+                email="test@example.com",
+            )
+            expected_payload = {
+                "sub": user.email,
+            }
+
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt:  # fmt: skip
+                with pytest.raises(jwt.PyJWTError, match="Test error"):
+                    create_refresh_token(user=user)
+
+            mock_create_jwt.assert_called_once_with(
+                token_type=settings.jwt_auth.refresh_token_type,
+                token_data=expected_payload,
+                expire_minutes=settings.jwt_auth.refresh_token_expire_minutes,
+            )
+
+
+class TestSecurity:
+    class TestHashPassword:
+        def test_success(self):
+            password = "password"
+
+            hashed_password = hash_password(password=password)
+
+            assert hashed_password != password.encode()
+            assert bcrypt.checkpw(password.encode(), hashed_password)
+
+        def test_different_salts(self):
+            password = "password"
+
+            hashed_password1 = hash_password(password=password)
+            hashed_password2 = hash_password(password=password)
+
+            assert hashed_password1 != hashed_password2
+
+    class TestVerifyPassword:
+        def test_success(self):
+            password = "password"
+            hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+            assert verify_password(password=password, correct_password=hashed_password)
+
+        def test_mismatched_passwords(self):
+            password = "password"
+            wrong_password = "wrongpassword"
+            hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+            assert not verify_password(
+                password=wrong_password,
+                correct_password=hashed_password,
+            )
+
+    class TestValidateTokenType:
+        def test_success(self):
+            expected_type = "access"
+            token_payload = {settings.jwt_auth.token_type_payload_key: expected_type}
+
+            assert validate_token_type(
+                token_payload=token_payload,
+                expected_type=expected_type,
+            )
+
+        def test_failure(self):
+            token_payload = {settings.jwt_auth.token_type_payload_key: "access"}
+            expected_type = "refresh"
+
+            assert not validate_token_type(
+                token_payload=token_payload,
+                expected_type=expected_type,
+            )
+
+    class TestGenerateEmailToken:
+        def test_default_length(self):
+            token = generate_email_token()
+
+            assert len(token) == settings.email_tokens.token_length
+            assert all(char in settings.email_tokens.token_symbols for char in token)
+
+        def test_custom_length(self):
+            length = 10
+            token = generate_email_token(length=length)
+
+            assert len(token) == length
+            assert all(char in settings.email_tokens.token_symbols for char in token)
+
+        def test_uniqueness(self):
+            token1 = generate_email_token()
+            token2 = generate_email_token()
+
+            assert token1 != token2
+
+    class TestValidateAvatarExtension:
+        def test_success(self):
+            avatar = MagicMock(spec=UploadFile, filename="avatar.jpg")
+
+            assert validate_avatar_extension(avatar)
+
+        def test_case_insensitive(self):
+            avatar = MagicMock(spec=UploadFile, filename="avatar.JPG")
+
+            assert validate_avatar_extension(avatar)
+
+        def test_failure(self):
+            avatar = MagicMock(spec=UploadFile, filename="avatar.txt")
+
+            assert not validate_avatar_extension(avatar)
+
+        def test_empty_filename(self):
+            avatar = MagicMock(spec=UploadFile, filename="")
+
+            assert not validate_avatar_extension(avatar)
+
+        def test_no_extension(self):
+            avatar = MagicMock(spec=UploadFile, filename="avatar")
+
+            assert not validate_avatar_extension(avatar)
+
+    @pytest.mark.anyio
+    class TestValidateAvatarSize:
+        async def test_success(self):
+            image: Image = Image.new("RGB", settings.avatar.size)
+            image_bytes = BytesIO()
+            image.save(image_bytes, format="JPEG")
+            image_data = image_bytes.getvalue()
+            avatar = MagicMock(spec=UploadFile)
+            avatar.read = AsyncMock(return_value=image_data)
+            avatar.seek = AsyncMock()
+
+            assert await validate_avatar_size(avatar=avatar)
+
+        async def test_failure(self):
+            image: Image = Image.new("RGB", (123, 456))
+            image_bytes = BytesIO()
+            image.save(image_bytes, format="JPEG")
+            image_data = image_bytes.getvalue()
+            avatar = MagicMock(spec=UploadFile)
+            avatar.read = AsyncMock(return_value=image_data)
+            avatar.seek = AsyncMock()
+
+            assert not await validate_avatar_size(avatar=avatar)

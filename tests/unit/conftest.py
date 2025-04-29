@@ -1,13 +1,11 @@
 import asyncio
+import datetime
 from asyncio import AbstractEventLoop
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
 
 import pytest
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from api.api_v1.utils.security import hash_password
-from core.config import settings
-from core.models import User, Token
-from core.models.db_helper import db_helper
 
 
 @pytest.fixture(scope="session")
@@ -23,48 +21,37 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture()
-def first_user() -> User:
-    return User(
-        email="first_user_email@email.com",
-        username="first_user_name",
-        hashed_password=hash_password("password"),
-        is_active=True,
-        is_email_verified=False,
-        tokens=Token(
-            email="first_user_email@email.com",
-            email_verification_token="qwerty",
-            forgot_password_token="123456",
-        ),
-    )
+def mock_db_session() -> AsyncMock:
+    return AsyncMock(spec=AsyncSession)
 
 
 @pytest.fixture()
-def second_user() -> User:
-    return User(
-        email="second_user_email@email.com",
-        username="second_user_name",
-        hashed_password=hash_password("password"),
-        is_active=True,
-        is_email_verified=False,
-        tokens=Token(
-            email="second_user_email@email.com",
-            email_verification_token="asdfgh",
-            forgot_password_token="zxcvbn",
-        ),
-    )
+def mock_background_tasks() -> Mock:
+    return Mock(spec=BackgroundTasks)
 
 
 @pytest.fixture()
-def token_data() -> dict[str, str]:
-    return {
-        "sub": "some_email_address@email.com",
-        "username": "username",
-        settings.jwt_auth.token_type_payload_key: "some_token_type",
-    }
+def mock_fastmail() -> MagicMock:
+    with patch("api.api_v1.utils.email.fm") as mock:
+        yield mock
 
 
-@pytest.fixture(scope="module")
-async def session() -> AsyncSession:
-    s = await anext(db_helper.get_session())
-    yield s
-    await s.close()
+@pytest.fixture()
+def mock_datetime_now(monkeypatch):
+    fixed_now = datetime.datetime(
+        year=2025,
+        month=1,
+        day=1,
+        hour=12,
+        minute=0,
+        second=0,
+        tzinfo=datetime.UTC,
+    )
+
+    class MockDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+    monkeypatch.setattr(target=datetime, name="datetime", value=MockDateTime)
+    return fixed_now
