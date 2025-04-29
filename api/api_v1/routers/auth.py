@@ -24,12 +24,11 @@ from api.api_v1.schemas.auth_responses import (
 )
 from api.api_v1.schemas.user import UserRegistrationScheme
 from api.api_v1.utils.database import (
-    create_user,
     confirm_user_email,
     update_user_email_verification_token,
-    create_user_tokens,
     update_forgot_password_token,
     change_user_password,
+    create_user_with_tokens,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
@@ -60,14 +59,10 @@ async def registration_endpoint(
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     hashed_password = hash_password(password=user_data.password)
-    new_user = await create_user(
+    await create_user_with_tokens(
         username=user_data.username,
         hashed_password=hashed_password,
         email=user_data.email,
-        session=session,
-    )
-    await create_user_tokens(
-        email=new_user.email,
         session=session,
     )
 
