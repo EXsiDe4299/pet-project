@@ -1,5 +1,4 @@
 import secrets
-import string
 from io import BytesIO
 from pathlib import Path
 
@@ -27,9 +26,8 @@ def validate_token_type(token_payload: dict, expected_type: str) -> bool:
     return token_type == expected_type
 
 
-def generate_email_token(length: int = 6) -> str:
-    symbols = string.ascii_lowercase + string.digits
-    email_verification_token = "".join(secrets.choice(symbols) for _ in range(length))
+def generate_email_token(length: int = settings.email_tokens.token_length) -> str:
+    email_verification_token = "".join(secrets.choice(settings.email_tokens.token_symbols) for _ in range(length)) # fmt: skip
     return email_verification_token
 
 
