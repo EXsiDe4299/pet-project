@@ -81,35 +81,22 @@ async def get_user_by_forgot_password_token(
 
 
 @__rollback_if_db_exception()
-async def create_user(
+async def create_user_with_tokens(
     *,
     username: str,
     hashed_password: bytes,
     email: str,
     session: AsyncSession,
-) -> User:
+) -> None:
     new_user = User(
         email=email,
         username=username,
         hashed_password=hashed_password,
     )
-    session.add(new_user)
-    await session.commit()
-    await session.refresh(new_user)
-    return new_user
-
-
-@__rollback_if_db_exception()
-async def create_user_tokens(
-    *,
-    email: str,
-    session: AsyncSession,
-) -> Token:
     tokens = Token(email=email)
+    session.add(new_user)
     session.add(tokens)
     await session.commit()
-    await session.refresh(tokens)
-    return tokens
 
 
 @__rollback_if_db_exception()
