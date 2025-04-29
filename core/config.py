@@ -1,4 +1,5 @@
 import logging
+import string
 from pathlib import Path
 from typing import Literal
 
@@ -127,6 +128,8 @@ class SmtpConfig(BaseModel):
 
 
 class EmailTokensConfig(BaseModel):
+    token_length: int = 6
+    token_symbols: str = string.ascii_lowercase + string.digits
     email_verification_token_exp_minutes: int = 10
     forgot_password_token_exp_minutes: int = 10
 
@@ -138,7 +141,7 @@ class AvatarConfig(BaseModel):
         ".jpeg": "image/jpeg",
         ".png": "image/png",
     }
-    size: tuple[int] = (200, 200)
+    size: tuple[int, int] = (200, 200)
 
 
 class Settings(BaseSettings):
