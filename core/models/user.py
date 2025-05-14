@@ -39,8 +39,6 @@ class User(Base):
         default=False,
         server_default=expression.false(),
     )
-    tokens: Mapped["Token"] = relationship(back_populates="user")
-    stories: Mapped[list["Story"]] = relationship(back_populates="author")
     role: Mapped[Role] = mapped_column(
         String(50),
         nullable=False,
@@ -48,8 +46,13 @@ class User(Base):
         server_default=Role.USER.value,
     )
 
+    tokens: Mapped["Token"] = relationship(back_populates="user", lazy="joined")
+    stories: Mapped[list["Story"]] = relationship(
+        back_populates="author", lazy="selectin"
+    )
 
     liked_stories: Mapped[list["Story"]] = relationship(
         secondary=UserStoryAssociation,
         back_populates="likers",
+        lazy="selectin",
     )
