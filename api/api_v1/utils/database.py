@@ -7,7 +7,6 @@ from sqlalchemy import select, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
-from typing_extensions import TypeVar
 
 from core.config import settings
 from core.models import User, Story
@@ -17,7 +16,7 @@ T = TypeVar("T")
 
 
 def __rollback_if_db_exception():
-    def wrapper(func: Callable[..., T]) -> Callable[..., T]:
+    def wrapper(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapped(**kwargs):
             session = None
