@@ -5,7 +5,9 @@ from sqlalchemy import ForeignKey, Text, UUID
 from sqlalchemy import text as text_
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
-from core.models import Base
+from core.models.base import Base
+
+from core.models.user_story_association import UserStoryAssociation
 
 if TYPE_CHECKING:
     from core.models import User
@@ -28,15 +30,16 @@ class Story(Base):
     )
 
     author_email: Mapped[str] = mapped_column(ForeignKey("users.email"), nullable=False)
-    author: Mapped["User"] = relationship(back_populates="stories")
+    author: Mapped["User"] = relationship(back_populates="stories", lazy="joined")
 
     likers: Mapped[list["User"]] = relationship(
-        secondary="user_story_association",
+        secondary=UserStoryAssociation,
         back_populates="liked_stories",
+        lazy="joined",
     )
 
     @validates("likes_number")
-    def validate_likes_number(self, key, likes_number):
+    def validate_likes_number(self, key, likes_number):  # noqa
         if likes_number < 0:
             raise ValueError("likes_number value cannot be less than 0")
         return likes_number
