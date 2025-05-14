@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String, Text
@@ -5,9 +6,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
 from core.models.base import Base
+from core.models.user_story_association import UserStoryAssociation
 
 if TYPE_CHECKING:
     from core.models import Token, Story
+
+
+class Role(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 class User(Base):
@@ -33,8 +41,15 @@ class User(Base):
     )
     tokens: Mapped["Token"] = relationship(back_populates="user")
     stories: Mapped[list["Story"]] = relationship(back_populates="author")
+    role: Mapped[Role] = mapped_column(
+        String(50),
+        nullable=False,
+        default=Role.USER,
+        server_default=Role.USER.value,
+    )
+
 
     liked_stories: Mapped[list["Story"]] = relationship(
-        secondary="user_story_association",
+        secondary=UserStoryAssociation,
         back_populates="likers",
     )
