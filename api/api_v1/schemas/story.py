@@ -28,3 +28,7 @@ class StoryInScheme(BasicStoryScheme):
             name=name,
             text=text,
         )
+
+
+class DeleteStoryResponse(BaseModel):
+    status: str = "success"
