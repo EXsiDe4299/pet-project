@@ -46,7 +46,7 @@ class LoggingConfig(BaseModel):
         "warning",
         "error",
         "critical",
-    ] = "debug"
+    ] = "info"
     log_format: str = (
         "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
     )
@@ -114,6 +114,26 @@ class StoriesRouterConfig(BaseModel):
     like_story_endpoint_path: str = "/{story_uuid}/like"
 
 
+class UsersRouterConfig(BaseModel):
+    prefix: str = "/users"
+    tags: list[str] = ["Users"]
+    get_user_endpoint_path: str = "/"
+    get_profile_endpoint_path: str = "/profile"
+    edit_profile_endpoint_path: str = "/edit-profile"
+    get_avatar_endpoint_path: str = "/avatar"
+
+
+class AdminRouterConfig(BaseModel):
+    prefix: str = "/admin"
+    tags: list[str] = ["Admin"]
+    get_active_users_endpoint_path: str = "/active-users"
+    get_inactive_users_endpoint_path: str = "/inactive-users"
+    make_admin_endpoint_path: str = "/make-admin"
+    demote_admin_endpoint_path: str = "/demote-admin"
+    block_user_endpoint_path: str = "/block-user"
+    unblock_user_endpoint_path: str = "/unblock-user"
+
+
 class SmtpConfig(BaseModel):
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
@@ -159,6 +179,8 @@ class Settings(BaseSettings):
     main_router: MainRouterConfig = MainRouterConfig()
     v1_router: V1RouterConfig = V1RouterConfig()
     auth_router: AuthRouterConfig = AuthRouterConfig()
+    users_router: UsersRouterConfig = UsersRouterConfig()
+    admin_router: AdminRouterConfig = AdminRouterConfig()
     smtp: SmtpConfig
     email_tokens: EmailTokensConfig = EmailTokensConfig()
     stories_router: StoriesRouterConfig = StoriesRouterConfig()
