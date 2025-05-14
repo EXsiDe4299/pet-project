@@ -3,6 +3,8 @@ from abc import abstractmethod, ABC
 from fastapi import Form
 from pydantic import BaseModel, EmailStr
 
+from api.api_v1.schemas.story import StoryScheme
+
 
 class UserInFromFormScheme(BaseModel, ABC):
     @classmethod
@@ -50,3 +52,17 @@ class UserLoginScheme(UserInFromFormScheme):
         password: str = Form(default=""),
     ) -> "UserLoginScheme":
         return cls(username_or_email=username_or_email, password=password)
+
+
+class UserScheme(BaseModel):
+    username: str
+    bio: str | None = None
+    is_active: bool
+    role: str
+    avatar_name: str | None = None
+    stories: list[StoryScheme]
+
+
+class UserProfileScheme(UserScheme):
+    email: str
+    liked_stories: list[StoryScheme]
