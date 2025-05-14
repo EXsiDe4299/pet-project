@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 from starlette.responses import FileResponse
 
 from api.api_v1.dependencies.auth import get_current_user_from_access_token
@@ -10,6 +11,7 @@ from api.api_v1.dependencies.users import (
     get_avatar_path_dependency,
     get_user_by_username_dependency,
 )
+from api.api_v1.schemas.user import UserScheme, UserProfileScheme
 from api.api_v1.utils.database import update_user
 from api.api_v1.utils.files import save_avatar, delete_avatar
 from core.config import settings
@@ -17,22 +19,34 @@ from core.models import User
 from core.models.db_helper import db_helper
 
 users_router = APIRouter(
-    prefix="/users",
-    tags=["Users"],
+    prefix=settings.users_router.prefix,
+    tags=settings.users_router.tags,
 )
 
 
-@users_router.get("/")
+@users_router.get(
+    settings.users_router.get_user_endpoint_path,
+    response_model=UserScheme,
+    status_code=status.HTTP_200_OK,
+)
 async def get_user_endpoint(user: User = Depends(get_user_by_username_dependency)):
     return user
 
 
-@users_router.get("/profile")
-async def get_user_endpoint(user: User = Depends(get_current_user_from_access_token)):
+@users_router.get(
+    settings.users_router.get_profile_endpoint_path,
+    response_model=UserProfileScheme,
+    status_code=status.HTTP_200_OK,
+)
+async def get_profile_endpoint(user: User = Depends(get_current_user_from_access_token)): # fmt: skip
     return user
 
 
-@users_router.patch("/edit-profile")
+@users_router.patch(
+    settings.users_router.edit_profile_endpoint_path,
+    response_model=UserProfileScheme,
+    status_code=status.HTTP_200_OK,
+)
 async def edit_profile_endpoint(
     avatar: UploadFile | None = Depends(validate_avatar_dependency),
     bio: str | None = Form(default=None),
@@ -68,7 +82,10 @@ async def edit_profile_endpoint(
     return updated_user
 
 
-@users_router.get("/avatar")
+@users_router.get(
+    settings.users_router.get_avatar_endpoint_path,
+    status_code=status.HTTP_200_OK,
+)
 async def get_avatar_endpoint(avatar_path: Path = Depends(get_avatar_path_dependency)):
     avatar_extension = Path(avatar_path).suffix.lower()
     media_type = settings.avatar.allowed_extensions_to_mime[avatar_extension]
