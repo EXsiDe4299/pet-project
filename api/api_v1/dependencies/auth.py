@@ -3,6 +3,7 @@ import datetime
 from fastapi import Depends, Cookie, Form
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
+from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.exceptions.http_exceptions import (
@@ -159,7 +160,7 @@ async def get_user_login_data(
 
 
 async def get_user_for_sending_forgot_password_token(
-    email: str = Form(default=""),
+    email: EmailStr = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
     user = await get_user_by_username_or_email(
