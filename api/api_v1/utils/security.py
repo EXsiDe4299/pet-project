@@ -10,7 +10,7 @@ from core.config import settings
 
 
 def hash_password(password: str) -> bytes:
-    salt: bytes = bcrypt.gensalt()
+    salt = bcrypt.gensalt()
     password_bytes = password.encode()
     hashed_password = bcrypt.hashpw(password_bytes, salt)
     return hashed_password
