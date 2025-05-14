@@ -21,8 +21,8 @@ class StoryInScheme(BasicStoryScheme):
     @classmethod
     def as_form(
         cls,
-        name: str = Form(),
-        text: str = Form(),
+        name: str = Form(default=""),
+        text: str = Form(default=""),
     ) -> "StoryInScheme":
         return cls(
             name=name,
