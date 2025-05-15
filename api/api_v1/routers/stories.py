@@ -5,7 +5,7 @@ from starlette import status
 from api.api_v1.dependencies.auth import get_current_user_from_access_token
 from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
 from api.api_v1.exceptions.http_exceptions import ManageOtherStories
-from api.api_v1.schemas.story import StoryScheme, StoryInScheme
+from api.api_v1.schemas.story import StoryScheme, StoryInScheme, DeleteStoryResponse
 from api.api_v1.utils.database import (
     get_stories,
     create_story,
@@ -95,7 +95,7 @@ async def create_story_endpoint(
     return new_story
 
 
-@stories_router.put(
+@stories_router.patch(
     settings.stories_router.edit_story_endpoint_path,
     response_model=StoryScheme,
     status_code=status.HTTP_200_OK,
@@ -104,39 +104,41 @@ async def edit_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
     story_data: StoryInScheme = Depends(StoryInScheme.as_form),
-    user: User = Depends(get_current_user_from_access_token),  # noqa
+    user: User = Depends(get_current_user_from_access_token),
 ):
-    if story in user.stories:
-        edited_story = await edit_story(
-            name=story_data.name,
-            text=story_data.text,
-            story=story,
-            session=session,
-        )
-        return edited_story
-    raise ManageOtherStories()
+    if story not in user.stories:
+        raise ManageOtherStories()
+    edited_story = await edit_story(
+        name=story_data.name,
+        text=story_data.text,
+        story=story,
+        session=session,
+    )
+    return edited_story
 
 
 @stories_router.delete(
     settings.stories_router.delete_story_endpoint_path,
+    response_model=DeleteStoryResponse,
     status_code=status.HTTP_200_OK,
 )
 async def delete_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
-    user: User = Depends(get_current_user_from_access_token),  # noqa
+    user: User = Depends(get_current_user_from_access_token),
 ):
-    if story in user.stories:
-        await delete_story(
-            story=story,
-            session=session,
-        )
-        return {"status": "success"}
-    raise ManageOtherStories()
+    if story not in user.stories:
+        raise ManageOtherStories()
+    await delete_story(
+        story=story,
+        session=session,
+    )
+    return DeleteStoryResponse()
 
 
 @stories_router.post(
     settings.stories_router.like_story_endpoint_path,
+    response_model=StoryScheme,
     status_code=status.HTTP_200_OK,
 )
 async def like_story_endpoint(
@@ -144,9 +146,9 @@ async def like_story_endpoint(
     session: AsyncSession = Depends(db_helper.get_session),
     user: User = Depends(get_current_user_from_access_token),
 ):
-    await like_story(
+    liked_story = await like_story(
         story=story,
         user=user,
         session=session,
     )
-    return {"status": "success"}
+    return liked_story
