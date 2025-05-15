@@ -10,8 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.models import User, Story
 from core.models.token import Token
-
-T = TypeVar("T")
+from core.models.user import Role
 
 
 def __rollback_if_db_exception():
@@ -274,6 +273,66 @@ async def update_user(
 ) -> User:
     user.bio = bio
     user.avatar_name = avatar_name
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def get_active_users(session: AsyncSession) -> Sequence[User]:
+    stmt = select(User).where(User.is_active)
+    result = await session.execute(stmt)
+    users = result.scalars().fetchall()
+    return users
+
+
+async def get_inactive_users(session: AsyncSession) -> Sequence[User]:
+    stmt = select(User).where(User.is_active == False)
+    result = await session.execute(stmt)
+    users = result.scalars().fetchall()
+    return users
+
+
+@__rollback_if_db_exception()
+async def make_admin(
+    user: User,
+    session: AsyncSession,
+) -> User:
+    user.role = Role.ADMIN
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@__rollback_if_db_exception()
+async def demote_admin(
+    user: User,
+    session: AsyncSession,
+) -> User:
+    user.role = Role.USER
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@__rollback_if_db_exception()
+async def block_user(
+    *,
+    user: User,
+    session: AsyncSession,
+) -> User:
+    user.is_active = False
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@__rollback_if_db_exception()
+async def unblock_user(
+    *,
+    user: User,
+    session: AsyncSession,
+) -> User:
+    user.is_active = True
     await session.commit()
     await session.refresh(user)
     return user
