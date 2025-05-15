@@ -192,3 +192,111 @@ class ManageOtherStories(HTTPException):
             status_code=status_code,
             detail=detail,
         )
+
+
+class AdminOrSuperAdminRequired(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_403_FORBIDDEN,
+        detail: str = "Only admin or super admin can perform this action",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class SuperAdminRequired(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_403_FORBIDDEN,
+        detail: str = "Only super admin can perform this action",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class CannotModifySelf(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_403_FORBIDDEN,
+        detail: str = "You cannot do this to yourself",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class SuperAdminCanModifyOnlyAdminsOrUsers(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_403_FORBIDDEN,
+        detail: str = "Super admins can modify only admins or users",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class AdminCanModifyOnlyUsers(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_403_FORBIDDEN,
+        detail: str = "Admins can modify only users",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class UserAlreadyBlocked(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        detail: str = "User is already blocked",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class UserIsNotBlocked(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        detail: str = "User is not blocked",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class UserAlreadyAdminOrSuperAdmin(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        detail: str = "User already is admin or super admin",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+
+
+class TargetMustBeAdmin(HTTPException):
+    def __init__(
+        self,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        detail: str = "Target must be an admin",
+    ):
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
