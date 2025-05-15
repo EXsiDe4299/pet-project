@@ -26,7 +26,7 @@ async def lifespan(application: FastAPI):
     async with db_helper.engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)  # bad practice!
     yield
-    await db_helper.dispose()
+    await db_helper.dispose()  # just in case
 
 
 app = FastAPI(lifespan=lifespan)
