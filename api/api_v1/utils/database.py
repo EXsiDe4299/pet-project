@@ -252,7 +252,7 @@ async def like_story(
     story: Story,
     user: User,
     session: AsyncSession,
-) -> None:
+) -> Story:
     if user not in story.likers:
         story.likes_number += 1
         story.likers.append(user)
@@ -260,6 +260,8 @@ async def like_story(
         story.likes_number -= 1
         story.likers.remove(user)
     await session.commit()
+    await session.refresh(story)
+    return story
 
 
 @__rollback_if_db_exception()
