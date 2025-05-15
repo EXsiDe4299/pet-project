@@ -30,6 +30,12 @@ from api.api_v1.utils.database import (
     delete_story,
     like_story,
     update_user,
+    get_active_users,
+    get_inactive_users,
+    make_admin,
+    demote_admin,
+    block_user,
+    unblock_user,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.files import save_avatar, delete_avatar
@@ -50,6 +56,7 @@ from api.api_v1.utils.security import (
 )
 from core.config import settings
 from core.models import User, Token, Story
+from core.models.user import Role
 
 
 @pytest.mark.anyio
@@ -707,6 +714,242 @@ class TestDatabase:
 
             mock_db_session.execute.assert_awaited_once()
             assert len(stories) == 0
+
+    class TestGetActiveUsers:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user1 = User(
+                username="user1",
+                is_active=True,
+            )
+            mock_user2 = User(
+                username="user2",
+                is_active=True,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_user1,
+                mock_user2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            active_users = await get_active_users(
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(active_users) == 2
+            assert active_users[0].username == "user1"
+            assert active_users[0].is_active == True
+            assert active_users[1].username == "user2"
+            assert active_users[1].is_active == True
+
+        async def test_empty_result(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_db_session.execute.return_value = mock_result
+
+            active_users = await get_active_users(
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(active_users) == 0
+
+    class TestGetInactiveUsers:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user1 = User(
+                username="user1",
+                is_active=False,
+            )
+            mock_user2 = User(
+                username="user2",
+                is_active=False,
+            )
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = [
+                mock_user1,
+                mock_user2,
+            ]
+            mock_db_session.execute.return_value = mock_result
+
+            inactive_users = await get_inactive_users(
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(inactive_users) == 2
+            assert inactive_users[0].username == "user1"
+            assert inactive_users[0].is_active == False
+            assert inactive_users[1].username == "user2"
+            assert inactive_users[1].is_active == False
+
+        async def test_empty_result(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_db_session.execute.return_value = mock_result
+
+            inactive_users = await get_inactive_users(
+                session=mock_db_session,
+            )
+
+            mock_db_session.execute.assert_awaited_once()
+            assert len(inactive_users) == 0
+
+    class TestMakeAdmin:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(role=Role.USER)
+
+            new_admin = await make_admin(
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(new_admin, User)
+            assert new_admin.role == Role.ADMIN
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(role=Role.USER)
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await make_admin(
+                    user=mock_user,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestDemoteAdmin:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_admin = User(role=Role.ADMIN)
+
+            demoted_admin = await demote_admin(
+                user=mock_admin,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(demoted_admin, User)
+            assert demoted_admin.role == Role.USER
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_admin = User(role=Role.ADMIN)
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await demote_admin(
+                    user=mock_admin,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestBlockUser:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(is_active=True)
+
+            blocked_user = await block_user(
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(blocked_user, User)
+            assert blocked_user.is_active == False
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(is_active=True)
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await demote_admin(
+                    user=mock_user,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+            mock_db_session.rollback.assert_awaited_once()
+
+    class TestUnblockUser:
+        async def test_success(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(is_active=False)
+
+            unblocked_user = await unblock_user(
+                user=mock_user,
+                session=mock_db_session,
+            )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_awaited_once()
+            mock_db_session.rollback.assert_not_awaited()
+
+            assert isinstance(unblocked_user, User)
+            assert unblocked_user.is_active == True
+
+        async def test_with_exception(
+            self,
+            mock_db_session: AsyncMock,
+        ):
+            mock_user = User(is_active=False)
+            mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
+
+            with pytest.raises(SQLAlchemyError, match="Test error"):
+                await unblock_user(
+                    user=mock_user,
+                    session=mock_db_session,
+                )
+
+            mock_db_session.commit.assert_awaited_once()
+            mock_db_session.refresh.assert_not_awaited()
+            mock_db_session.rollback.assert_awaited_once()
 
     class TestCreateStory:
         async def test_success(
