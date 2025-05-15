@@ -6,7 +6,6 @@ from uuid import UUID
 from sqlalchemy import select, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
 
 from core.config import settings
 from core.models import User, Story
@@ -38,12 +37,7 @@ async def get_user_by_username_or_email(
     username: str = "",
     email: str = "",
 ) -> User | None:
-    stmt = (
-        select(User)
-        .options(joinedload(User.tokens))
-        .options(selectinload(User.stories))
-        .where(or_(User.username == username, User.email == email))
-    )
+    stmt = select(User).where(or_(User.username == username, User.email == email))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
@@ -57,7 +51,6 @@ async def get_user_by_email_verification_token(
         select(User)
         .join(User.tokens)
         .where(Token.email_verification_token == email_verification_token)
-        .options(joinedload(User.tokens))
     )
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
@@ -72,7 +65,6 @@ async def get_user_by_forgot_password_token(
         select(User)
         .join(User.tokens)
         .where(Token.forgot_password_token == forgot_password_token)
-        .options(joinedload(User.tokens))
     )
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
@@ -165,11 +157,9 @@ async def get_stories(
     session: AsyncSession,
 ) -> Sequence[Story]:
     result = await session.execute(
-        select(Story, User)
-        .join(User, User.email == Story.author_email)
-        .options(selectinload(Story.author))
+        select(Story, User).join(User, User.email == Story.author_email)
     )
-    stories = result.scalars().fetchall()
+    stories = result.unique().scalars().fetchall()
     return stories
 
 
@@ -181,9 +171,8 @@ async def get_stories_by_name_or_text(
         select(Story, User)
         .join(User, User.email == Story.author_email)
         .where(or_(Story.name.ilike(f"%{query}%"), Story.text.ilike(f"%{query}%")))
-        .options(selectinload(Story.author))
     )
-    stories = result.scalars().fetchall()
+    stories = result.unique().scalars().fetchall()
     return stories
 
 
@@ -192,12 +181,11 @@ async def get_story_by_uuid(
     session: AsyncSession,
 ) -> Story | None:
     result = await session.execute(
-        select(Story)
+        select(Story, User)
+        .join(User, User.email == Story.author_email)
         .where(Story.id == story_uuid)
-        .options(selectinload(Story.likers))
-        .options(selectinload(Story.author))
     )
-    story = result.scalar_one_or_none()
+    story = result.unique().scalar_one_or_none()
     return story
 
 
@@ -209,10 +197,8 @@ async def get_author_stories(
         select(Story, User)
         .join(User, User.email == Story.author_email)
         .where(User.username == author_username)
-        .options(selectinload(Story.likers))
-        .options(selectinload(Story.author))
     )
-    stories = result.scalars().fetchall()
+    stories = result.unique().scalars().fetchall()
     return stories
 
 
