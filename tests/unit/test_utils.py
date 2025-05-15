@@ -493,7 +493,7 @@ class TestDatabase:
             mock_story1 = Story(name="story 1")
             mock_story2 = Story(name="story 2")
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = [
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
             ]
@@ -511,7 +511,9 @@ class TestDatabase:
             mock_db_session: AsyncMock,
         ):
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
+                []
+            )
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories(session=mock_db_session)
@@ -525,7 +527,9 @@ class TestDatabase:
             mock_db_session: AsyncMock,
         ):
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
+                []
+            )
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories_by_name_or_text(
@@ -543,7 +547,7 @@ class TestDatabase:
             mock_story1 = Story(name="story 1 name")
             mock_story2 = Story(name="story 2 name")
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = [
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
             ]
@@ -566,7 +570,7 @@ class TestDatabase:
             mock_story1 = Story(text="story 1 text")
             mock_story2 = Story(text="story 2 text")
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = [
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
             ]
@@ -590,7 +594,7 @@ class TestDatabase:
             mock_story2 = Story(name="story 2 name", text="test story 2 text")
             mock_story3 = Story(name="story 3 name", text="test story 3 text")
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = [
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
                 mock_story3,
@@ -619,7 +623,7 @@ class TestDatabase:
             story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
             mock_story = Story(id=story_id)
             mock_result = MagicMock(spec=Result)
-            mock_result.scalar_one_or_none.return_value = mock_story
+            mock_result.unique.return_value.scalar_one_or_none.return_value = mock_story
             mock_db_session.execute.return_value = mock_result
 
             story = await get_story_by_uuid(
@@ -635,7 +639,7 @@ class TestDatabase:
         ):
             story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
             mock_result = MagicMock(spec=Result)
-            mock_result.scalar_one_or_none.return_value = None
+            mock_result.unique.return_value.scalar_one_or_none.return_value = None
             mock_db_session.execute.return_value = mock_result
 
             story = await get_story_by_uuid(
@@ -665,7 +669,7 @@ class TestDatabase:
                 author=author,
             )
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = [
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
             ]
@@ -691,7 +695,9 @@ class TestDatabase:
         ):
             username = "nonexistent"
             mock_result = MagicMock(spec=Result)
-            mock_result.scalars.return_value.fetchall.return_value = []
+            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
+                []
+            )
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_author_stories(
@@ -1014,11 +1020,9 @@ class TestFiles:
             mock_avatar.read.return_value = b"test data"
             username = "username"
             avatar_name = "username.png"
-            # сделай фикстуру mock_file...
             mock_file = AsyncMock()
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.open", return_value=mock_file) as mock_aiofiles_open:
                 with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
 
@@ -1035,11 +1039,9 @@ class TestFiles:
             mock_avatar.filename = "test.png"
             mock_avatar.read.side_effect = OSError("Test error")
             username = "username"
-            # сделай фикстуру mock_file...
             mock_file = AsyncMock()
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.open", return_value=mock_file):
                 with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
                     with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
@@ -1055,11 +1057,9 @@ class TestFiles:
             mock_avatar.filename = "test.png"
             mock_avatar.read.side_effect = OSError("Test error")
             username = "username"
-            # сделай фикстуру mock_file...
             mock_file = AsyncMock()
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.open", return_value=mock_file):
                 with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
                     with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
@@ -1073,7 +1073,6 @@ class TestFiles:
     class TestDeleteAvatar:
         async def test_success(self):
             avatar_name = "test.png"
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
                 with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove: # fmt: skip
 
@@ -1085,7 +1084,6 @@ class TestFiles:
 
         async def test_file_not_found(self):
             avatar_name = "nonexistent.png"
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists:  # fmt: skip
                 with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove:  # fmt: skip
 
@@ -1097,7 +1095,6 @@ class TestFiles:
 
         async def test_with_exception_no_delete(self):
             avatar_name = "test.png"
-            # сделай фикстуры хотя бы пэтчей!!!
             with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists:  # fmt: skip
                 with patch("aiofiles.os.remove", new_callable=AsyncMock, side_effect=OSError("Test error")) as mock_remove:  # fmt: skip
 
