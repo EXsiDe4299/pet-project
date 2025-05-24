@@ -1,3 +1,5 @@
+import datetime
+
 from fastapi import Form
 from pydantic import BaseModel, UUID4
 
@@ -14,6 +16,7 @@ class AuthorScheme(BaseModel):
 class StoryScheme(BasicStoryScheme):
     id: UUID4
     likes_number: int
+    created_at: datetime.datetime
     author: AuthorScheme
 
 
