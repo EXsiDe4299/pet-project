@@ -1,3 +1,4 @@
+import datetime
 from abc import abstractmethod, ABC
 
 from fastapi import Form
@@ -59,6 +60,7 @@ class UserScheme(BaseModel):
     bio: str | None = None
     is_active: bool
     role: str
+    registered_at: datetime.datetime
     avatar_name: str | None = None
     stories: list[StoryScheme]
 
