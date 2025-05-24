@@ -40,8 +40,12 @@ admin_router = APIRouter(
 async def get_active_users_endpoint(
     _: User = Depends(verify_admin_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
+    page: int = 1,
 ):
-    users = await get_active_users(session=session)
+    users = await get_active_users(
+        session=session,
+        page=page,
+    )
     return users
 
 
@@ -53,8 +57,12 @@ async def get_active_users_endpoint(
 async def get_inactive_users_endpoint(
     _: User = Depends(verify_admin_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
+    page: int = 1,
 ):
-    users = await get_inactive_users(session=session)
+    users = await get_inactive_users(
+        session=session,
+        page=page,
+    )
     return users
 
 
