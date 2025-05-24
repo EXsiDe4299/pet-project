@@ -154,9 +154,16 @@ async def confirm_user_email(
 
 async def get_stories(
     session: AsyncSession,
+    page: int = 1,
+    per_page: int = 20,
 ) -> Sequence[Story]:
+    offset = (page - 1) * per_page
     result = await session.execute(
-        select(Story, User).join(User, User.email == Story.author_email)
+        select(Story, User)
+        .join(User, User.email == Story.author_email)
+        .order_by(Story.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
     )
     stories = result.unique().scalars().fetchall()
     return stories
@@ -165,11 +172,17 @@ async def get_stories(
 async def get_stories_by_name_or_text(
     query: str,
     session: AsyncSession,
+    page: int = 1,
+    per_page: int = 20,
 ) -> Sequence[Story]:
+    offset = (page - 1) * per_page
     result = await session.execute(
         select(Story, User)
         .join(User, User.email == Story.author_email)
         .where(or_(Story.name.ilike(f"%{query}%"), Story.text.ilike(f"%{query}%")))
+        .order_by(Story.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
     )
     stories = result.unique().scalars().fetchall()
     return stories
@@ -191,11 +204,17 @@ async def get_story_by_uuid(
 async def get_author_stories(
     author_username: str,
     session: AsyncSession,
+    page: int = 1,
+    per_page: int = 20,
 ) -> Sequence[Story]:
+    offset = (page - 1) * per_page
     result = await session.execute(
         select(Story, User)
         .join(User, User.email == Story.author_email)
         .where(User.username == author_username)
+        .order_by(Story.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
     )
     stories = result.unique().scalars().fetchall()
     return stories
@@ -278,15 +297,37 @@ async def update_user(
     return user
 
 
-async def get_active_users(session: AsyncSession) -> Sequence[User]:
-    stmt = select(User).where(User.is_active)
+async def get_active_users(
+    session: AsyncSession,
+    page: int = 1,
+    per_page: int = 20,
+) -> Sequence[User]:
+    offset = (page - 1) * per_page
+    stmt = (
+        select(User)
+        .where(User.is_active)
+        .order_by(User.registered_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
     result = await session.execute(stmt)
     users = result.scalars().fetchall()
     return users
 
 
-async def get_inactive_users(session: AsyncSession) -> Sequence[User]:
-    stmt = select(User).where(User.is_active == False)
+async def get_inactive_users(
+    session: AsyncSession,
+    page: int = 1,
+    per_page: int = 20,
+) -> Sequence[User]:
+    offset = (page - 1) * per_page
+    stmt = (
+        select(User)
+        .where(User.is_active == False)
+        .order_by(User.registered_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
     result = await session.execute(stmt)
     users = result.scalars().fetchall()
     return users
