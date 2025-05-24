@@ -1,7 +1,8 @@
+import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, func, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import expression
 
@@ -44,6 +45,12 @@ class User(Base):
         nullable=False,
         default=Role.USER,
         server_default=Role.USER.value,
+    )
+    registered_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=Base.utc_now,
+        server_default=func.now(),
     )
 
     tokens: Mapped["Token"] = relationship(back_populates="user", lazy="joined")
