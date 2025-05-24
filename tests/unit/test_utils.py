@@ -308,9 +308,9 @@ class TestDatabase:
 
             assert isinstance(updated_tokens, Token)
             assert updated_tokens.email_verification_token == email_verification_token
-            expected_expiration = datetime.datetime.now() + datetime.timedelta(
-                minutes=expire_minutes
-            )
+            expected_expiration = datetime.datetime.now(
+                datetime.UTC
+            ) + datetime.timedelta(minutes=expire_minutes)
             expiration_time_diff = abs(
                 (
                     updated_tokens.email_verification_token_exp - expected_expiration
@@ -359,9 +359,9 @@ class TestDatabase:
 
             assert isinstance(updated_tokens, Token)
             assert updated_tokens.forgot_password_token == forgot_password_token
-            expected_expiration = datetime.datetime.now() + datetime.timedelta(
-                minutes=expire_minutes
-            )
+            expected_expiration = datetime.datetime.now(
+                datetime.UTC
+            ) + datetime.timedelta(minutes=expire_minutes)
             expiration_time_diff = abs(
                 (
                     updated_tokens.forgot_password_token_exp - expected_expiration
