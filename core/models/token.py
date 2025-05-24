@@ -1,7 +1,7 @@
 import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy import ForeignKey, UniqueConstraint, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models import Base
@@ -19,9 +19,13 @@ class Token(Base):
 
     email_verification_token: Mapped[str] = mapped_column(nullable=True)
     email_verification_token_exp: Mapped[datetime.datetime] = mapped_column(
-        nullable=True
+        DateTime(timezone=True),
+        nullable=True,
     )
     forgot_password_token: Mapped[str] = mapped_column(nullable=True)
-    forgot_password_token_exp: Mapped[datetime.datetime] = mapped_column(nullable=True)
+    forgot_password_token_exp: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     __table_args__ = (UniqueConstraint("email"),)
