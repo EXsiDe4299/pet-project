@@ -97,9 +97,9 @@ async def update_user_email_verification_token(
     session: AsyncSession,
     expire_minutes: int = settings.email_tokens.email_verification_token_exp_minutes,
 ) -> Token:
-    email_verification_token_exp = datetime.datetime.now() + datetime.timedelta(
-        minutes=expire_minutes
-    )
+    email_verification_token_exp = datetime.datetime.now(
+        datetime.UTC
+    ) + datetime.timedelta(minutes=expire_minutes)
     user_tokens.email_verification_token = email_verification_token
     user_tokens.email_verification_token_exp = email_verification_token_exp
     await session.commit()
@@ -115,9 +115,9 @@ async def update_forgot_password_token(
     session: AsyncSession,
     expire_minutes: int = settings.email_tokens.forgot_password_token_exp_minutes,
 ) -> Token:
-    forgot_password_token_exp = datetime.datetime.now() + datetime.timedelta(
-        minutes=expire_minutes
-    )
+    forgot_password_token_exp = datetime.datetime.now(
+        datetime.UTC
+    ) + datetime.timedelta(minutes=expire_minutes)
     user_tokens.forgot_password_token = forgot_password_token
     user_tokens.forgot_password_token_exp = forgot_password_token_exp
     await session.commit()

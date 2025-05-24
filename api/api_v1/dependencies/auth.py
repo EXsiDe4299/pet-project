@@ -113,7 +113,7 @@ async def get_user_for_email_confirming(
         raise InvalidConfirmEmailCode()
     if user.is_email_verified:
         raise EmailAlreadyVerified()
-    if user.tokens.email_verification_token_exp < datetime.datetime.now():
+    if user.tokens.email_verification_token_exp < datetime.datetime.now(datetime.UTC):
         raise InvalidConfirmEmailCode()
 
     return user
@@ -191,7 +191,7 @@ async def get_user_for_changing_password(
         raise InvalidEmail()
     if not user.is_active:
         raise InactiveUser()
-    if user.tokens.forgot_password_token_exp < datetime.datetime.now():
+    if user.tokens.forgot_password_token_exp < datetime.datetime.now(datetime.UTC):
         raise InvalidChangePasswordCode()
 
     return user
