@@ -9,7 +9,6 @@ from starlette.responses import Response
 
 from api.main_router import api_router
 from core.config import settings
-from core.models.base import Base
 from core.models.db_helper import db_helper
 
 logging.basicConfig(
@@ -23,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    async with db_helper.engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)  # bad practice!
     yield
     await db_helper.dispose()  # just in case
 
