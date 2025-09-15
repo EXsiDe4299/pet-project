@@ -1,6 +1,5 @@
 import logging
 import time
-from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -9,7 +8,6 @@ from starlette.responses import Response
 
 from api.main_router import api_router
 from core.config import settings
-from core.models.db_helper import db_helper
 
 logging.basicConfig(
     level=settings.log.log_level_value,
@@ -20,13 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(application: FastAPI):
-    yield
-    await db_helper.dispose()  # just in case
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.include_router(router=api_router)
 
@@ -52,5 +44,4 @@ if __name__ == "__main__":
         host=settings.run.host,
         port=settings.run.port,
         reload=True,
-        access_log=False,
     )
