@@ -17,13 +17,13 @@ class Token(Base):
     email: Mapped[str] = mapped_column(ForeignKey("users.email"))
     user: Mapped["User"] = relationship(back_populates="tokens")
 
-    email_verification_token: Mapped[str] = mapped_column(nullable=True)
-    email_verification_token_exp: Mapped[datetime.datetime] = mapped_column(
+    email_verification_token: Mapped[str | None] = mapped_column(nullable=True)
+    email_verification_token_exp: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
-    forgot_password_token: Mapped[str] = mapped_column(nullable=True)
-    forgot_password_token_exp: Mapped[datetime.datetime] = mapped_column(
+    forgot_password_token: Mapped[str | None] = mapped_column(nullable=True)
+    forgot_password_token_exp: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

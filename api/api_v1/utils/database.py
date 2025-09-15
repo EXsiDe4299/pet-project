@@ -3,6 +3,7 @@ import functools
 from typing import Sequence, Callable
 from uuid import UUID
 
+from pydantic import EmailStr
 from sqlalchemy import select, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +35,7 @@ def __rollback_if_db_exception():
 async def get_user_by_username_or_email(
     session: AsyncSession,
     username: str = "",
-    email: str = "",
+    email: str | EmailStr = "",
 ) -> User | None:
     stmt = select(User).where(or_(User.username == username, User.email == email))
     result = await session.execute(stmt)
@@ -75,7 +76,7 @@ async def create_user_with_tokens(
     *,
     username: str,
     hashed_password: bytes,
-    email: str,
+    email: str | EmailStr,
     session: AsyncSession,
 ) -> None:
     new_user = User(

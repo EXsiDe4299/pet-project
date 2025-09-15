@@ -1,5 +1,6 @@
 from fastapi import BackgroundTasks
 from fastapi_mail import MessageSchema, MessageType, ConnectionConfig, FastMail
+from pydantic import EmailStr
 
 from core.config import settings
 
@@ -9,7 +10,7 @@ fm = FastMail(smtp_config)
 
 def send_plain_message_to_email(
     subject: str,
-    email_address: str,
+    email_address: str | EmailStr,
     body: str,
     background_tasks: BackgroundTasks,
 ) -> None:

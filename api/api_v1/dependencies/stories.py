@@ -1,5 +1,6 @@
+from uuid import UUID
+
 from fastapi import Depends
-from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.exceptions.http_exceptions import StoryNotFound
@@ -9,7 +10,7 @@ from core.models.db_helper import db_helper
 
 
 async def get_story_by_uuid_dependency(
-    story_uuid: UUID4,
+    story_uuid: UUID,
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> Story:
     story = await get_story_by_uuid(
