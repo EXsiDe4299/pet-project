@@ -1,5 +1,6 @@
 import datetime
 import functools
+import inspect
 from typing import Sequence, Callable
 from uuid import UUID
 
@@ -14,22 +15,40 @@ from core.models.token import Token
 from core.models.user import Role
 
 
-def __rollback_if_db_exception():
-    def wrapper(func: Callable) -> Callable:
+def __rollback_if_db_exception(session_param_name: str = "session"):
+    def inner(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapped(**kwargs):
-            session = None
+        async def wrapper(*args, **kwargs):
+            session = kwargs.get(session_param_name)
+
+            # пользователь может передать сессию позиционным аргументом,
+            # поэтому нам нужно проверить еще и args
+            if session is None:
+                signature = inspect.signature(func)
+                param_names = list(signature.parameters.keys())
+                try:
+                    session_index = param_names.index(session_param_name)
+                    session = args[session_index]
+                except (ValueError, IndexError):
+                    pass
+
+            if session is None:
+                raise ValueError(
+                    f"Function {func.__name__} has no '{session_param_name}' parameter"
+                )
+            if not isinstance(session, AsyncSession):
+                raise ValueError("Session object does not have rollback method")
+
             try:
-                session = kwargs.get("session")
-                result = await func(**kwargs)
+                result = await func(*args, **kwargs)
                 return result
             except SQLAlchemyError:
                 await session.rollback()
                 raise
 
-        return wrapped
+        return wrapper
 
-    return wrapper
+    return inner
 
 
 async def get_user_by_username_or_email(
