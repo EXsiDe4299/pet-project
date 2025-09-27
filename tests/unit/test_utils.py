@@ -1,5 +1,7 @@
 import datetime
+import uuid
 from io import BytesIO
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import UUID
 
@@ -1267,7 +1269,7 @@ class TestFiles:
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
             with patch("aiofiles.open", return_value=mock_file) as mock_aiofiles_open:
-                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists:  # fmt: skip
 
                     result = await save_avatar(mock_avatar, username)
 
@@ -1286,8 +1288,8 @@ class TestFiles:
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
             with patch("aiofiles.open", return_value=mock_file):
-                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
-                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists:  # fmt: skip
+                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete:  # fmt: skip
 
                         with pytest.raises(OSError, match="Test error"):
                             await save_avatar(mock_avatar, username)
@@ -1304,8 +1306,8 @@ class TestFiles:
             mock_file.__aenter__.return_value = mock_file
             mock_file.__aexit__.return_value = None
             with patch("aiofiles.open", return_value=mock_file):
-                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists: # fmt: skip
-                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete: # fmt: skip
+                with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=False) as mock_exists:  # fmt: skip
+                    with patch("api.api_v1.utils.files.delete_avatar", new_callable=AsyncMock) as mock_delete:  # fmt: skip
 
                         with pytest.raises(OSError, match="Test error"):
                             await save_avatar(mock_avatar, username)
@@ -1316,8 +1318,8 @@ class TestFiles:
     class TestDeleteAvatar:
         async def test_success(self):
             avatar_name = "test.png"
-            with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists: # fmt: skip
-                with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove: # fmt: skip
+            with patch("aiofiles.os.path.exists", new_callable=AsyncMock, return_value=True) as mock_exists:  # fmt: skip
+                with patch("aiofiles.os.remove", new_callable=AsyncMock) as mock_remove:  # fmt: skip
 
                     await delete_avatar(avatar_name=avatar_name)
 
@@ -1358,51 +1360,66 @@ class TestJWTAuth:
             expire_minutes = 30
 
             expected_result = "encoded_token"
-            expected_exp = mock_datetime_now + datetime.timedelta(minutes=expire_minutes) # fmt: skip
-            expected_payload = payload.copy()
-            expected_payload.update(exp=expected_exp, iat=mock_datetime_now)
+            expected_exp = mock_datetime_now + datetime.timedelta(minutes=expire_minutes)  # fmt: skip
+            expected_payload: dict[str, Any] = payload.copy()
+            expected_jti = str(uuid.uuid4())
+            expected_payload.update(
+                jti=expected_jti,
+                exp=expected_exp,
+                iat=mock_datetime_now,
+            )
 
             with patch("jwt.encode", return_value=expected_result) as mock_jwt_encode:
-                result = encode_jwt(
-                    payload=payload,
-                    private_key=private_key,
-                    algorithm=algorithm,
-                    expire_minutes=expire_minutes,
-                )
+                with patch("uuid.uuid4", return_value=expected_jti):
+                    result = encode_jwt(
+                        payload=payload,
+                        private_key=private_key,
+                        algorithm=algorithm,
+                        expire_minutes=expire_minutes,
+                    )
 
-                mock_jwt_encode.assert_called_once_with(
-                    payload=expected_payload,
-                    key=private_key,
-                    algorithm=algorithm,
-                )
-                assert result == expected_result
+                    mock_jwt_encode.assert_called_once_with(
+                        payload=expected_payload,
+                        key=private_key,
+                        algorithm=algorithm,
+                    )
+                    assert result == expected_result
 
         def test_expire_minutes_zero(self, mock_datetime_now):
             payload = {"sub": 123}
+            expected_jti = str(uuid.uuid4())
+            expected_payload: dict[str, Any] = payload.copy()
+            expected_payload.update(
+                jti=expected_jti,
+                exp=mock_datetime_now,
+                iat=mock_datetime_now,
+            )
 
             with patch("jwt.encode") as mock_jwt_encode:
-                encode_jwt(payload=payload, expire_minutes=0)
+                with patch("uuid.uuid4", return_value=expected_jti):
+                    encode_jwt(payload=payload, expire_minutes=0)
 
-                expected_payload = payload.copy()
-                expected_payload.update(exp=mock_datetime_now, iat=mock_datetime_now)
-                kwargs = mock_jwt_encode.call_args[1]
-                assert kwargs["payload"] == expected_payload
+                    kwargs = mock_jwt_encode.call_args[1]
+                    assert kwargs["payload"] == expected_payload
 
         def test_with_exception(self, mock_datetime_now):
             payload = {"sub": 123}
-
-            with patch('jwt.encode', side_effect=jwt.PyJWTError('Test error')) as mock_jwt_encode: # fmt: skip
-                with pytest.raises(jwt.PyJWTError, match="Test error"):
-                    encode_jwt(payload=payload)
-
-            expected_payload = payload.copy()
+            expected_payload: dict[str, Any] = payload.copy()
             expected_expire_minutes = mock_datetime_now + datetime.timedelta(
                 minutes=settings.jwt_auth.access_token_expire_minutes
             )
+            expected_jti = str(uuid.uuid4())
             expected_payload.update(
+                jti=expected_jti,
                 exp=expected_expire_minutes,
                 iat=mock_datetime_now,
             )
+
+            with patch('jwt.encode', side_effect=jwt.PyJWTError('Test error')) as mock_jwt_encode:  # fmt: skip
+                with patch("uuid.uuid4", return_value=expected_jti):
+                    with pytest.raises(jwt.PyJWTError, match="Test error"):
+                        encode_jwt(payload=payload)
+
             mock_jwt_encode.assert_called_once_with(
                 payload=expected_payload,
                 key=settings.jwt_auth.private_key_path.read_text(),
@@ -1435,7 +1452,7 @@ class TestJWTAuth:
             public_key = "test_public_key"
             algorithm = "RS256"
 
-            with patch("jwt.decode", side_effect=jwt.InvalidTokenError('Test error')) as mock_jwt_decode: # fmt: skip
+            with patch("jwt.decode", side_effect=jwt.InvalidTokenError('Test error')) as mock_jwt_decode:  # fmt: skip
                 with pytest.raises(jwt.InvalidTokenError, match="Test error"):
                     decode_jwt(
                         token=token,
@@ -1454,7 +1471,7 @@ class TestJWTAuth:
             public_key = "test_public_key"
             algorithm = "RS256"
 
-            with patch("jwt.decode", side_effect=jwt.ExpiredSignatureError('Test error')) as mock_jwt_decode: # fmt: skip
+            with patch("jwt.decode", side_effect=jwt.ExpiredSignatureError('Test error')) as mock_jwt_decode:  # fmt: skip
                 with pytest.raises(jwt.ExpiredSignatureError, match="Test error"):
                     decode_jwt(
                         token=token,
@@ -1471,7 +1488,7 @@ class TestJWTAuth:
     class TestCreateJWT:
         def test_success(self):
             token_type = "access"
-            token_data = {"sub": 123}
+            token_data: dict[str, Any] = {"sub": 123}
             expire_minutes = 30
             expected_payload = token_data.copy()
             expected_payload.update(
@@ -1481,7 +1498,7 @@ class TestJWTAuth:
             )
             expected_result = "encoded_token"
 
-            with patch("api.api_v1.utils.jwt_auth.encode_jwt", return_value=expected_result) as mock_encode_jwt: # fmt: skip
+            with patch("api.api_v1.utils.jwt_auth.encode_jwt", return_value=expected_result) as mock_encode_jwt:  # fmt: skip
                 result = create_jwt(
                     token_type=token_type,
                     token_data=token_data,
@@ -1496,7 +1513,7 @@ class TestJWTAuth:
 
         def test_with_exception(self):
             token_type = "access"
-            token_data = {"sub": 123}
+            token_data: dict[str, Any] = {"sub": 123}
             expire_minutes = 30
             expected_payload = token_data.copy()
             expected_payload.update(
@@ -1505,7 +1522,7 @@ class TestJWTAuth:
                 }
             )
 
-            with patch("api.api_v1.utils.jwt_auth.encode_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_encode_jwt: # fmt: skip
+            with patch("api.api_v1.utils.jwt_auth.encode_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_encode_jwt:  # fmt: skip
                 with pytest.raises(jwt.PyJWTError, match="Test error"):
                     create_jwt(
                         token_type=token_type,
@@ -1530,7 +1547,7 @@ class TestJWTAuth:
             }
             expected_result = "encoded_access_token"
 
-            with patch("api.api_v1.utils.jwt_auth.create_jwt", return_value=expected_result) as mock_create_jwt: # fmt: skip
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", return_value=expected_result) as mock_create_jwt:  # fmt: skip
                 result = create_access_token(user=user)
 
                 mock_create_jwt.assert_called_once_with(
@@ -1550,7 +1567,7 @@ class TestJWTAuth:
                 "username": user.username,
             }
 
-            with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt: # fmt: skip
+            with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt:  # fmt: skip
                 with pytest.raises(jwt.PyJWTError, match="Test error"):
                     create_access_token(user=user)
 
@@ -1702,7 +1719,7 @@ class TestSecurity:
     @pytest.mark.anyio
     class TestValidateAvatarSize:
         async def test_success(self):
-            image: Image = Image.new("RGB", settings.avatar.size)
+            image = Image.new("RGB", settings.avatar.size)
             image_bytes = BytesIO()
             image.save(image_bytes, format="JPEG")
             image_data = image_bytes.getvalue()
@@ -1713,7 +1730,7 @@ class TestSecurity:
             assert await validate_avatar_size(avatar=avatar)
 
         async def test_failure(self):
-            image: Image = Image.new("RGB", (123, 456))
+            image = Image.new("RGB", (123, 456))
             image_bytes = BytesIO()
             image.save(image_bytes, format="JPEG")
             image_data = image_bytes.getvalue()
