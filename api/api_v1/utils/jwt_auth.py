@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 import jwt
 
@@ -16,6 +17,7 @@ def encode_jwt(
     now = datetime.datetime.now(datetime.UTC)
     expire = now + datetime.timedelta(minutes=expire_minutes)
     to_encode.update(
+        jti=str(uuid.uuid4()),
         exp=expire,
         iat=now,
     )
