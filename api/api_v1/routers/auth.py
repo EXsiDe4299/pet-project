@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, Form
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
@@ -11,8 +12,10 @@ from api.api_v1.dependencies.auth import (
     get_user_for_sending_email_verification_token,
     get_user_for_sending_forgot_password_token,
     get_user_for_changing_password,
+    get_payload_from_access_token,
 )
 from api.api_v1.dependencies.db_helper import db_helper
+from api.api_v1.dependencies.redis_helper import redis_helper
 from api.api_v1.schemas.auth_responses import (
     LoginResponse,
     LogoutResponse,
@@ -24,6 +27,7 @@ from api.api_v1.schemas.auth_responses import (
     ForgotPasswordResponse,
 )
 from api.api_v1.schemas.user import UserRegistrationScheme
+from api.api_v1.utils.cache import add_token_to_blacklist
 from api.api_v1.utils.database import (
     confirm_user_email,
     update_user_email_verification_token,
@@ -42,7 +46,6 @@ from api.api_v1.utils.security import (
 )
 from core.config import settings
 from core.models import User
-from core.models.db_helper import db_helper
 
 auth_router = APIRouter(
     prefix=settings.auth_router.prefix,
@@ -220,11 +223,16 @@ async def refresh_jwt_endpoint(
     )
 
 
-@auth_router.get(
+@auth_router.post(
     settings.auth_router.logout_endpoint_path,
     status_code=status.HTTP_200_OK,
     response_model=LogoutResponse,
 )
-async def logout_endpoint(response: Response):
+async def logout_endpoint(
+    response: Response,
+    access_token_payload: dict = Depends(get_payload_from_access_token),
+    cache: Redis = Depends(redis_helper.get_redis),
+):
+    await add_token_to_blacklist(payload=access_token_payload, cache=cache)
     response.delete_cookie(settings.cookie.refresh_token_key)
     return LogoutResponse()
