@@ -4,9 +4,11 @@ from fastapi import Depends, Cookie, Form
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 from pydantic import EmailStr
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.api_v1.dependencies.db_helper import db_helper
+from api.api_v1.dependencies.redis_helper import redis_helper
 from api.api_v1.exceptions.http_exceptions import (
     InvalidJWT,
     InvalidJWTType,
@@ -19,6 +21,7 @@ from api.api_v1.exceptions.http_exceptions import (
     InvalidCredentials,
 )
 from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
+from api.api_v1.utils.cache import is_token_in_blacklist
 from api.api_v1.utils.database import (
     get_user_by_email_verification_token,
     get_user_by_username_or_email,
@@ -28,7 +31,6 @@ from api.api_v1.utils.jwt_auth import decode_jwt
 from api.api_v1.utils.security import validate_token_type, verify_password
 from core.config import settings
 from core.models import User
-from core.models.db_helper import db_helper
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=(
@@ -40,11 +42,11 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-async def __get_user_from_token(
+async def _validate_and_decode_token(
     token: str,
     token_type: str,
-    session: AsyncSession,
-) -> User:
+    cache: Redis,
+) -> dict:
     try:
         token_payload = decode_jwt(token=token)
     except InvalidTokenError:
@@ -52,6 +54,24 @@ async def __get_user_from_token(
     if not validate_token_type(token_payload=token_payload, expected_type=token_type):
         raise InvalidJWTType()
 
+    jti = token_payload.get("jti")
+    if await is_token_in_blacklist(jti=jti, cache=cache):
+        raise InvalidJWT()
+
+    return token_payload
+
+
+async def _get_user_from_token(
+    token: str,
+    token_type: str,
+    session: AsyncSession,
+    cache: Redis,
+) -> User:
+    token_payload = await _validate_and_decode_token(
+        token=token,
+        token_type=token_type,
+        cache=cache,
+    )
     email = token_payload.get("sub")
     user = await get_user_by_username_or_email(email=email, session=session)
     if user is None:
@@ -65,25 +85,41 @@ async def __get_user_from_token(
     return user
 
 
+async def get_payload_from_access_token(
+    access_token: str = Depends(oauth2_scheme),
+    cache: Redis = Depends(redis_helper.get_redis),
+) -> dict:
+    token_payload = await _validate_and_decode_token(
+        token=access_token,
+        token_type=settings.jwt_auth.access_token_type,
+        cache=cache,
+    )
+    return token_payload
+
+
 async def get_current_user_from_access_token(
     access_token: str = Depends(oauth2_scheme),
     session: AsyncSession = Depends(db_helper.get_session),
+    cache: Redis = Depends(redis_helper.get_redis),
 ) -> User:
-    return await __get_user_from_token(
+    return await _get_user_from_token(
         token=access_token,
         token_type=settings.jwt_auth.access_token_type,
         session=session,
+        cache=cache,
     )
 
 
 async def get_current_user_from_refresh_token(
     refresh_token: str = Cookie(),
     session: AsyncSession = Depends(db_helper.get_session),
+    cache: Redis = Depends(redis_helper.get_redis),
 ) -> User:
-    return await __get_user_from_token(
+    return await _get_user_from_token(
         token=refresh_token,
         token_type=settings.jwt_auth.refresh_token_type,
         session=session,
+        cache=cache,
     )
 
 
@@ -120,7 +156,7 @@ async def get_user_for_email_confirming(
     return user
 
 
-async def __verify_user(
+async def _verify_user(
     user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
@@ -141,7 +177,7 @@ async def __verify_user(
 
 
 async def get_user_for_sending_email_verification_token(
-    user: User = Depends(__verify_user),
+    user: User = Depends(_verify_user),
 ) -> User:
     if user.is_email_verified:
         raise EmailAlreadyVerified()
@@ -149,7 +185,7 @@ async def get_user_for_sending_email_verification_token(
 
 
 async def get_user_login_data(
-    user: User = Depends(__verify_user),
+    user: User = Depends(_verify_user),
 ) -> User:
     if not user.is_active:
         raise InactiveUser()
