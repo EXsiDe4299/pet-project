@@ -3,7 +3,7 @@ import string
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, PostgresDsn, computed_field
+from pydantic import BaseModel, PostgresDsn, computed_field, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,20 @@ class DatabaseConfig(BaseModel):
     def url(self) -> PostgresDsn:
         return PostgresDsn(
             url=f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}",
+        )
+
+
+class RedisConfig(BaseModel):
+    host: str
+    port: int
+    db: int
+    decode_responses: bool = False
+
+    @computed_field
+    @property
+    def url(self) -> RedisDsn:
+        return RedisDsn(
+            url=f"redis://{self.host}:{self.port}/{self.db}?decode_responses={self.decode_responses}"
         )
 
 
@@ -173,6 +187,7 @@ class Settings(BaseSettings):
     )
     run: RunConfig = RunConfig()
     db: DatabaseConfig
+    redis: RedisConfig
     log: LoggingConfig = LoggingConfig()
     jwt_auth: JWTAuthConfig = JWTAuthConfig()
     cookie: CookieConfig = CookieConfig()
