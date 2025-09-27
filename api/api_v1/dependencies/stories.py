@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.api_v1.exceptions.http_exceptions import StoryNotFound
 from api.api_v1.utils.database import get_story_by_uuid
 from core.models import Story
-from core.models.db_helper import db_helper
+from api.api_v1.dependencies.db_helper import db_helper
 
 
 async def get_story_by_uuid_dependency(

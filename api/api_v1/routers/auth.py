@@ -12,6 +12,7 @@ from api.api_v1.dependencies.auth import (
     get_user_for_sending_forgot_password_token,
     get_user_for_changing_password,
 )
+from api.api_v1.dependencies.db_helper import db_helper
 from api.api_v1.schemas.auth_responses import (
     LoginResponse,
     LogoutResponse,

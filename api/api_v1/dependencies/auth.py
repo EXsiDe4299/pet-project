@@ -6,6 +6,7 @@ from jwt import InvalidTokenError
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.api_v1.dependencies.db_helper import db_helper
 from api.api_v1.exceptions.http_exceptions import (
     InvalidJWT,
     InvalidJWTType,

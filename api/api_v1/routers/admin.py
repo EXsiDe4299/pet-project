@@ -23,7 +23,7 @@ from api.api_v1.utils.database import (
 )
 from core.config import settings
 from core.models import User
-from core.models.db_helper import db_helper
+from api.api_v1.dependencies.db_helper import db_helper
 from core.models.user import Role
 
 admin_router = APIRouter(

@@ -17,7 +17,7 @@ from api.api_v1.utils.database import (
 )
 from core.config import settings
 from core.models import User, Story
-from core.models.db_helper import db_helper
+from api.api_v1.dependencies.db_helper import db_helper
 
 stories_router = APIRouter(
     prefix=settings.stories_router.prefix,

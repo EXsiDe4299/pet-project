@@ -13,11 +13,11 @@ from core.config import settings
 class DbHelper:
     def __init__(
         self,
-        url,
-        echo,
-        echo_pool,
-        max_overflow,
-        pool_size,
+        url: str,
+        echo: bool,
+        echo_pool: bool,
+        max_overflow: int,
+        pool_size: int,
     ):
         self.engine: AsyncEngine = create_async_engine(
             url=url,
