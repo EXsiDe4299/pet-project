@@ -17,6 +17,16 @@ services:
       timeout: 3s
       retries: 3
 
+  redis:
+    image: redis:8.2.1-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
   app:
     build:
       dockerfile: Dockerfile
@@ -24,4 +34,6 @@ services:
       - "8000:8000"
     depends_on:
       pg:
+        condition: service_healthy
+      redis:
         condition: service_healthy
