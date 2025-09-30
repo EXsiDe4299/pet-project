@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import FileResponse
 
-from api.api_v1.dependencies.auth import get_current_user_from_access_token
+from api.api_v1.dependencies.auth import get_user_from_access_token
 from api.api_v1.dependencies.users import (
     validate_avatar_dependency,
     get_avatar_path_dependency,
@@ -38,7 +38,7 @@ async def get_user_endpoint(user: User = Depends(get_user_by_username_dependency
     response_model=UserProfileScheme,
     status_code=status.HTTP_200_OK,
 )
-async def get_profile_endpoint(user: User = Depends(get_current_user_from_access_token)): # fmt: skip
+async def get_profile_endpoint(user: User = Depends(get_user_from_access_token)): # fmt: skip
     return user
 
 
@@ -50,7 +50,7 @@ async def get_profile_endpoint(user: User = Depends(get_current_user_from_access
 async def edit_profile_endpoint(
     avatar: UploadFile | None = Depends(validate_avatar_dependency),
     bio: str | None = Form(default=None),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_user_from_access_token),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     new_avatar_name = None

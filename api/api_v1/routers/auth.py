@@ -8,7 +8,7 @@ from starlette import status
 from starlette.responses import Response
 
 from api.api_v1.dependencies.auth import (
-    get_current_user_from_refresh_token,
+    get_user_from_refresh_token,
     get_payload_from_access_token,
     get_and_verify_user_from_form,
 )
@@ -263,7 +263,7 @@ async def login_endpoint(
 )
 async def refresh_jwt_endpoint(
     response: Response,
-    user: User = Depends(get_current_user_from_refresh_token),
+    user: User = Depends(get_user_from_refresh_token),
 ):
     new_access_token = create_access_token(user)
     new_refresh_token = create_refresh_token(user)

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from api.api_v1.dependencies.auth import get_current_user_from_access_token
+from api.api_v1.dependencies.auth import get_user_from_access_token
 from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
 from api.api_v1.exceptions.http_exceptions import ManageOtherStories
 from api.api_v1.schemas.story import StoryScheme, StoryInScheme, DeleteStoryResponse
@@ -93,7 +93,7 @@ async def get_author_stories_endpoint(
 )
 async def create_story_endpoint(
     story_data: StoryInScheme = Depends(StoryInScheme.as_form),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_user_from_access_token),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     new_story = await create_story(
@@ -114,7 +114,7 @@ async def edit_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
     story_data: StoryInScheme = Depends(StoryInScheme.as_form),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_user_from_access_token),
 ):
     if story not in user.stories:
         raise ManageOtherStories()
@@ -135,7 +135,7 @@ async def edit_story_endpoint(
 async def delete_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_user_from_access_token),
 ):
     if story not in user.stories:
         raise ManageOtherStories()
@@ -154,7 +154,7 @@ async def delete_story_endpoint(
 async def like_story_endpoint(
     story: Story = Depends(get_story_by_uuid_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
-    user: User = Depends(get_current_user_from_access_token),
+    user: User = Depends(get_user_from_access_token),
 ):
     liked_story = await like_story(
         story=story,

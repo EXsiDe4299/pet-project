@@ -1,6 +1,6 @@
 from fastapi import Depends
 
-from api.api_v1.dependencies.auth import get_current_user_from_access_token
+from api.api_v1.dependencies.auth import get_user_from_access_token
 from api.api_v1.dependencies.users import get_user_by_username_dependency
 from api.api_v1.exceptions.http_exceptions import (
     AdminOrSuperAdminRequired,
@@ -13,7 +13,7 @@ from core.models.user import Role
 
 
 async def verify_admin_dependency(
-    current_user: User = Depends(get_current_user_from_access_token),
+    current_user: User = Depends(get_user_from_access_token),
 ) -> User:
     if current_user.role not in {Role.ADMIN, Role.SUPER_ADMIN}:
         raise AdminOrSuperAdminRequired()
@@ -22,7 +22,7 @@ async def verify_admin_dependency(
 
 async def validate_user_modification_dependency(
     target_user: User = Depends(get_user_by_username_dependency),
-    current_user: User = Depends(get_current_user_from_access_token),
+    current_user: User = Depends(get_user_from_access_token),
 ) -> User:
     if current_user.username == target_user.username:
         raise CannotModifySelf()

@@ -96,7 +96,7 @@ async def get_and_verify_user_from_form(
     return user
 
 
-async def get_current_user_from_access_token(
+async def get_user_from_access_token(
     access_token: str = Depends(oauth2_scheme),
     session: AsyncSession = Depends(db_helper.get_session),
     cache: Redis = Depends(redis_helper.get_redis),
@@ -109,7 +109,7 @@ async def get_current_user_from_access_token(
     )
 
 
-async def get_current_user_from_refresh_token(
+async def get_user_from_refresh_token(
     refresh_token: str = Cookie(),
     session: AsyncSession = Depends(db_helper.get_session),
     cache: Redis = Depends(redis_helper.get_redis),
