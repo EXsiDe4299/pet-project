@@ -1,9 +1,6 @@
-import datetime
-
-from fastapi import Depends, Cookie, Form
+from fastapi import Depends, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
-from pydantic import EmailStr
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,18 +11,12 @@ from api.api_v1.exceptions.http_exceptions import (
     InvalidJWTType,
     InactiveUser,
     InvalidEmail,
-    AlreadyRegistered,
-    InvalidConfirmEmailCode,
-    InvalidChangePasswordCode,
-    EmailAlreadyVerified,
     InvalidCredentials,
 )
-from api.api_v1.schemas.user import UserRegistrationScheme, UserLoginScheme
+from api.api_v1.schemas.user import UserLoginScheme
 from api.api_v1.utils.cache import is_token_in_blacklist
 from api.api_v1.utils.database import (
-    get_user_by_email_verification_token,
     get_user_by_username_or_email,
-    get_user_by_forgot_password_token,
 )
 from api.api_v1.utils.jwt_auth import decode_jwt
 from api.api_v1.utils.security import validate_token_type, verify_password
@@ -85,16 +76,24 @@ async def _get_user_from_token(
     return user
 
 
-async def get_payload_from_access_token(
-    access_token: str = Depends(oauth2_scheme),
-    cache: Redis = Depends(redis_helper.get_redis),
-) -> dict:
-    token_payload = await _validate_and_decode_token(
-        token=access_token,
-        token_type=settings.jwt_auth.access_token_type,
-        cache=cache,
+async def get_and_verify_user_from_form(
+    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
+    session: AsyncSession = Depends(db_helper.get_session),
+) -> User:
+    user = await get_user_by_username_or_email(
+        username=user_data.username_or_email,
+        email=user_data.username_or_email,
+        session=session,
     )
-    return token_payload
+    if user is None:
+        raise InvalidCredentials()
+
+    if not verify_password(
+        password=user_data.password,
+        correct_password=user.hashed_password,
+    ):
+        raise InvalidCredentials()
+    return user
 
 
 async def get_current_user_from_access_token(
@@ -123,112 +122,12 @@ async def get_current_user_from_refresh_token(
     )
 
 
-async def get_user_registration_data(
-    user_data: UserRegistrationScheme = Depends(UserRegistrationScheme.as_form),
-    session: AsyncSession = Depends(db_helper.get_session),
-) -> UserRegistrationScheme:
-    existing_user = await get_user_by_username_or_email(
-        username=user_data.username,
-        email=user_data.email,
-        session=session,
+async def get_payload_from_access_token(
+    access_token: str = Depends(oauth2_scheme),
+    cache: Redis = Depends(redis_helper.get_redis),
+) -> dict:
+    return await _validate_and_decode_token(
+        token=access_token,
+        token_type=settings.jwt_auth.access_token_type,
+        cache=cache,
     )
-    if existing_user:
-        raise AlreadyRegistered()
-    return user_data
-
-
-async def get_user_for_email_confirming(
-    email_verification_token: str = Form(default=""),
-    session: AsyncSession = Depends(db_helper.get_session),
-) -> User:
-    email_verification_token = email_verification_token.lower()
-    user = await get_user_by_email_verification_token(
-        email_verification_token=email_verification_token,
-        session=session,
-    )
-    if user is None:
-        raise InvalidConfirmEmailCode()
-    if user.is_email_verified:
-        raise EmailAlreadyVerified()
-    if user.tokens.email_verification_token_exp < datetime.datetime.now(datetime.UTC):
-        raise InvalidConfirmEmailCode()
-
-    return user
-
-
-async def _verify_user(
-    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
-    session: AsyncSession = Depends(db_helper.get_session),
-) -> User:
-    user = await get_user_by_username_or_email(
-        username=user_data.username_or_email,
-        email=user_data.username_or_email,
-        session=session,
-    )
-    if user is None:
-        raise InvalidCredentials()
-
-    if not verify_password(
-        password=user_data.password,
-        correct_password=user.hashed_password,
-    ):
-        raise InvalidCredentials()
-    return user
-
-
-async def get_user_for_sending_email_verification_token(
-    user: User = Depends(_verify_user),
-) -> User:
-    if user.is_email_verified:
-        raise EmailAlreadyVerified()
-    return user
-
-
-async def get_user_login_data(
-    user: User = Depends(_verify_user),
-) -> User:
-    if not user.is_active:
-        raise InactiveUser()
-
-    if not user.is_email_verified:
-        raise InvalidEmail()
-
-    return user
-
-
-async def get_user_for_sending_forgot_password_token(
-    email: EmailStr = Form(default=""),
-    session: AsyncSession = Depends(db_helper.get_session),
-) -> User:
-    user = await get_user_by_username_or_email(
-        email=email,
-        session=session,
-    )
-    if user is None:
-        raise InvalidEmail()
-    if not user.is_email_verified:
-        raise InvalidEmail()
-    if not user.is_active:
-        raise InactiveUser()
-
-    return user
-
-
-async def get_user_for_changing_password(
-    forgot_password_token: str = Form(default=""),
-    session: AsyncSession = Depends(db_helper.get_session),
-) -> User:
-    user = await get_user_by_forgot_password_token(
-        forgot_password_token=forgot_password_token,
-        session=session,
-    )
-    if user is None:
-        raise InvalidChangePasswordCode()
-    if not user.is_email_verified:
-        raise InvalidEmail()
-    if not user.is_active:
-        raise InactiveUser()
-    if user.tokens.forgot_password_token_exp < datetime.datetime.now(datetime.UTC):
-        raise InvalidChangePasswordCode()
-
-    return user
