@@ -1,4 +1,7 @@
+import datetime
+
 from fastapi import APIRouter, Depends, BackgroundTasks, Form
+from pydantic import EmailStr
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -6,16 +9,19 @@ from starlette.responses import Response
 
 from api.api_v1.dependencies.auth import (
     get_current_user_from_refresh_token,
-    get_user_registration_data,
-    get_user_login_data,
-    get_user_for_email_confirming,
-    get_user_for_sending_email_verification_token,
-    get_user_for_sending_forgot_password_token,
-    get_user_for_changing_password,
     get_payload_from_access_token,
+    get_and_verify_user_from_form,
 )
 from api.api_v1.dependencies.db_helper import db_helper
 from api.api_v1.dependencies.redis_helper import redis_helper
+from api.api_v1.exceptions.http_exceptions import (
+    AlreadyRegistered,
+    EmailAlreadyVerified,
+    InvalidConfirmEmailCode,
+    InactiveUser,
+    InvalidEmail,
+    InvalidChangePasswordCode,
+)
 from api.api_v1.schemas.auth_responses import (
     LoginResponse,
     LogoutResponse,
@@ -34,6 +40,9 @@ from api.api_v1.utils.database import (
     update_forgot_password_token,
     change_user_password,
     create_user_with_tokens,
+    get_user_by_username_or_email,
+    get_user_by_email_verification_token,
+    get_user_by_forgot_password_token,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
 from api.api_v1.utils.jwt_auth import (
@@ -59,9 +68,17 @@ auth_router = APIRouter(
     response_model=RegistrationResponse,
 )
 async def registration_endpoint(
-    user_data: UserRegistrationScheme = Depends(get_user_registration_data),
+    user_data: UserRegistrationScheme = Depends(UserRegistrationScheme.as_form),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    existing_user = await get_user_by_username_or_email(
+        username=user_data.username,
+        email=user_data.email,
+        session=session,
+    )
+    if existing_user:
+        raise AlreadyRegistered()
+
     hashed_password = hash_password(password=user_data.password)
     await create_user_with_tokens(
         username=user_data.username,
@@ -80,9 +97,12 @@ async def registration_endpoint(
 )
 async def send_email_verification_token_endpoint(
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_user_for_sending_email_verification_token),
+    user: User = Depends(get_and_verify_user_from_form),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    if user.is_email_verified:
+        raise EmailAlreadyVerified()
+
     email_verification_token = generate_email_token()
 
     updated_tokens = await update_user_email_verification_token(
@@ -106,9 +126,21 @@ async def send_email_verification_token_endpoint(
     response_model=ConfirmEmailResponse,
 )
 async def confirm_email_endpoint(
-    user: User = Depends(get_user_for_email_confirming),
+    email_verification_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    email_verification_token = email_verification_token.lower().strip()
+    user = await get_user_by_email_verification_token(
+        email_verification_token=email_verification_token,
+        session=session,
+    )
+    if user is None:
+        raise InvalidConfirmEmailCode()
+    if user.is_email_verified:
+        raise EmailAlreadyVerified()
+    if user.tokens.email_verification_token_exp < datetime.datetime.now(datetime.UTC):
+        raise InvalidConfirmEmailCode()
+
     await confirm_user_email(
         user=user,
         session=session,
@@ -124,9 +156,20 @@ async def confirm_email_endpoint(
 )
 async def forgot_password_endpoint(
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_user_for_sending_forgot_password_token),
+    email: EmailStr = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    user = await get_user_by_username_or_email(
+        email=email,
+        session=session,
+    )
+    if user is None:
+        raise InvalidEmail()
+    if not user.is_email_verified:
+        raise InvalidEmail()
+    if not user.is_active:
+        raise InactiveUser()
+
     forgot_password_token = generate_email_token()
     updated_tokens = await update_forgot_password_token(
         user_tokens=user.tokens,
@@ -151,9 +194,23 @@ async def forgot_password_endpoint(
 )
 async def change_password_endpoint(
     new_password: str = Form(min_length=3, max_length=100, default=""),
-    user: User = Depends(get_user_for_changing_password),
+    forgot_password_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    forgot_password_token = forgot_password_token.lower().strip()
+    user = await get_user_by_forgot_password_token(
+        forgot_password_token=forgot_password_token,
+        session=session,
+    )
+    if user is None:
+        raise InvalidChangePasswordCode()
+    if not user.is_email_verified:
+        raise InvalidEmail()
+    if not user.is_active:
+        raise InactiveUser()
+    if user.tokens.forgot_password_token_exp < datetime.datetime.now(datetime.UTC):
+        raise InvalidChangePasswordCode()
+
     new_hashed_password = hash_password(password=new_password)
     await change_user_password(
         user=user,
@@ -170,8 +227,14 @@ async def change_password_endpoint(
 )
 async def login_endpoint(
     response: Response,
-    user: User = Depends(get_user_login_data),
+    user: User = Depends(get_and_verify_user_from_form),
 ):
+    if not user.is_active:
+        raise InactiveUser()
+
+    if not user.is_email_verified:
+        raise InvalidEmail()
+
     access_token = create_access_token(user=user)
     refresh_token = create_refresh_token(user=user)
 

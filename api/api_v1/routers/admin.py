@@ -5,12 +5,11 @@ from starlette import status
 from api.api_v1.dependencies.admin import (
     verify_admin_dependency,
     validate_user_modification_dependency,
-    check_user_is_active_dependency,
-    check_user_is_inactive_dependency,
 )
+from api.api_v1.dependencies.db_helper import db_helper
 from api.api_v1.exceptions.http_exceptions import (
-    UserAlreadyAdminOrSuperAdmin,
-    TargetMustBeAdmin,
+    UserAlreadyBlocked,
+    UserIsNotBlocked,
 )
 from api.api_v1.schemas.user import UserScheme
 from api.api_v1.utils.database import (
@@ -23,8 +22,6 @@ from api.api_v1.utils.database import (
 )
 from core.config import settings
 from core.models import User
-from api.api_v1.dependencies.db_helper import db_helper
-from core.models.user import Role
 
 admin_router = APIRouter(
     prefix=settings.admin_router.prefix,
@@ -75,8 +72,6 @@ async def make_admin_endpoint(
     target_user: User = Depends(validate_user_modification_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
-    if target_user.role == Role.ADMIN:
-        raise UserAlreadyAdminOrSuperAdmin()
     new_admin = await make_admin(user=target_user, session=session)
     return new_admin
 
@@ -90,8 +85,6 @@ async def demote_admin_endpoint(
     target_user: User = Depends(validate_user_modification_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
-    if target_user.role == Role.USER:
-        raise TargetMustBeAdmin()
     demoted_admin = await demote_admin(user=target_user, session=session)
     return demoted_admin
 
@@ -102,9 +95,11 @@ async def demote_admin_endpoint(
     status_code=status.HTTP_200_OK,
 )
 async def block_user_endpoint(
-    target_user: User = Depends(check_user_is_active_dependency),
+    target_user: User = Depends(validate_user_modification_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    if not target_user.is_active:
+        raise UserAlreadyBlocked()
     blocked_user = await block_user(user=target_user, session=session)
     return blocked_user
 
@@ -115,8 +110,10 @@ async def block_user_endpoint(
     status_code=status.HTTP_200_OK,
 )
 async def unblock_user_endpoint(
-    target_user: User = Depends(check_user_is_inactive_dependency),
+    target_user: User = Depends(validate_user_modification_dependency),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    if target_user.is_active:
+        raise UserIsNotBlocked()
     unblocked_user = await unblock_user(user=target_user, session=session)
     return unblocked_user
