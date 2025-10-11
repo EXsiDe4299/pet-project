@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from api.api_v1.dependencies.auth import get_user_from_access_token
+from api.api_v1.dependencies.auth.auth import get_user_from_access_token
 from api.api_v1.dependencies.stories import get_story_by_uuid_dependency
 from api.api_v1.exceptions.http_exceptions import ManageOtherStories
 from api.api_v1.schemas.story import StoryScheme, StoryInScheme, DeleteStoryResponse

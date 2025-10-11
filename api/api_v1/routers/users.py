@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import FileResponse
 
-from api.api_v1.dependencies.auth import get_user_from_access_token
+from api.api_v1.dependencies.auth.auth import get_user_from_access_token
 from api.api_v1.dependencies.users import (
     validate_avatar_dependency,
     get_avatar_path_dependency,

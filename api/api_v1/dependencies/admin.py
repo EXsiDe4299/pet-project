@@ -1,6 +1,6 @@
 from fastapi import Depends
 
-from api.api_v1.dependencies.auth import get_user_from_access_token
+from api.api_v1.dependencies.auth.auth import get_user_from_access_token
 from api.api_v1.dependencies.users import get_user_by_username_dependency
 from api.api_v1.exceptions.http_exceptions import (
     AdminOrSuperAdminRequired,
