@@ -6,7 +6,7 @@ from api.api_v1.dependencies.admin import (
     verify_admin_dependency,
     validate_user_modification_dependency,
 )
-from api.api_v1.dependencies.db_helper import db_helper
+from api.api_v1.dependencies.database.db_helper import db_helper
 from api.api_v1.exceptions.http_exceptions import (
     UserAlreadyBlocked,
     UserIsNotBlocked,

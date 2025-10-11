@@ -12,8 +12,8 @@ from api.api_v1.dependencies.auth import (
     get_payload_from_access_token,
     get_and_verify_user_from_form,
 )
-from api.api_v1.dependencies.db_helper import db_helper
-from api.api_v1.dependencies.redis_helper import redis_helper
+from api.api_v1.dependencies.database.db_helper import db_helper
+from api.api_v1.dependencies.database.redis_helper import redis_helper
 from api.api_v1.exceptions.http_exceptions import (
     AlreadyRegistered,
     EmailAlreadyVerified,

@@ -16,7 +16,7 @@ from api.api_v1.utils.database import update_user
 from api.api_v1.utils.files import save_avatar, delete_avatar
 from core.config import settings
 from core.models import User
-from api.api_v1.dependencies.db_helper import db_helper
+from api.api_v1.dependencies.database.db_helper import db_helper
 
 users_router = APIRouter(
     prefix=settings.users_router.prefix,

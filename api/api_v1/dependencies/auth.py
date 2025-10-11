@@ -4,8 +4,8 @@ from jwt import InvalidTokenError
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.api_v1.dependencies.db_helper import db_helper
-from api.api_v1.dependencies.redis_helper import redis_helper
+from api.api_v1.dependencies.database.db_helper import db_helper
+from api.api_v1.dependencies.database.redis_helper import redis_helper
 from api.api_v1.exceptions.http_exceptions import (
     InvalidJWT,
     InvalidJWTType,

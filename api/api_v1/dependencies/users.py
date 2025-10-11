@@ -16,7 +16,7 @@ from api.api_v1.utils.database import get_user_by_username_or_email
 from api.api_v1.utils.security import validate_avatar_extension, validate_avatar_size
 from core.config import settings
 from core.models import User
-from api.api_v1.dependencies.db_helper import db_helper
+from api.api_v1.dependencies.database.db_helper import db_helper
 
 
 def validate_avatar_dependency(
