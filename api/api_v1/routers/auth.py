@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
 
-from api.api_v1.dependencies.auth.auth import (
+from api.api_v1.dependencies.auth import (
     get_user_from_refresh_token,
     get_payload_from_access_token,
     get_and_verify_user_from_form,
