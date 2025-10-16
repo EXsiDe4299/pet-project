@@ -15,7 +15,7 @@ from core.models.token import Token
 from core.models.user import Role
 
 
-def __rollback_if_db_exception(session_param_name: str = "session"):
+def _rollback_if_db_exception(session_param_name: str = "session"):
     def inner(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -90,7 +90,7 @@ async def get_user_by_forgot_password_token(
     return user
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def create_user_with_tokens(
     *,
     username: str,
@@ -109,7 +109,7 @@ async def create_user_with_tokens(
     await session.commit()
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def update_user_email_verification_token(
     *,
     user_tokens: Token,
@@ -127,7 +127,7 @@ async def update_user_email_verification_token(
     return user_tokens
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def update_forgot_password_token(
     *,
     user_tokens: Token,
@@ -145,7 +145,7 @@ async def update_forgot_password_token(
     return user_tokens
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def change_user_password(
     *,
     user: User,
@@ -160,7 +160,7 @@ async def change_user_password(
     return user
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def confirm_user_email(
     *,
     user: User,
@@ -240,7 +240,7 @@ async def get_author_stories(
     return stories
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def create_story(
     *,
     name: str,
@@ -259,7 +259,7 @@ async def create_story(
     return new_story
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def edit_story(
     *,
     name: str,
@@ -274,7 +274,7 @@ async def edit_story(
     return story
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def delete_story(
     *,
     story: Story,
@@ -284,7 +284,7 @@ async def delete_story(
     await session.commit()
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def like_story(
     *,
     story: Story,
@@ -302,7 +302,7 @@ async def like_story(
     return story
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def update_user(
     *,
     bio: str | None = None,
@@ -353,7 +353,7 @@ async def get_inactive_users(
     return users
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def make_admin(
     user: User,
     session: AsyncSession,
@@ -364,7 +364,7 @@ async def make_admin(
     return user
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def demote_admin(
     user: User,
     session: AsyncSession,
@@ -375,7 +375,7 @@ async def demote_admin(
     return user
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def block_user(
     *,
     user: User,
@@ -387,7 +387,7 @@ async def block_user(
     return user
 
 
-@__rollback_if_db_exception()
+@_rollback_if_db_exception()
 async def unblock_user(
     *,
     user: User,
