@@ -2,7 +2,8 @@
 
 [RU 🇷🇺](README.md) | [EN 🇬🇧](README.en.md)
 
-This is an educational REST API implemented using FastAPI. The project is in development. As my skills improve, I will add new endpoints, refine the code structure, and add more functionality.
+This is a learning REST API implemented using FastAPI. The project is in development. As my skills improve, I will add
+new endpoints, refine the code structure, and add more functionality.
 
 ## Table of Contents
 
@@ -25,13 +26,26 @@ This is an educational REST API implemented using FastAPI. The project is in dev
 3. **Configure the environment:**
 
     Create a `.env` file and configure the environment variables.
+    
+    - Linux:
     ```bash
     cp .env.template .env
     ```
 
-    ⚠️ **Important:** The value of `APP_CONFIG__DB__HOST` must exactly **match the service name** in `docker-compose.yml` (in our case it is called `pg`). The same applies to `APP_CONFIG__REDIS__HOST`, its value should be identical to the one defined in `docker-compose.yml` (in our case that’s `redis`).
+    - Windows:
+    ```bash
+    copy .env.template .env
+    ```
 
-    I deliberately added `private.pem` and `public.pem` to the certificates directory so you don’t have to create them yourself. However, if you want to generate your own certificates, you can do so using the following commands:
+    The value of `APP_CONFIG__DB__HOST` must exactly **match the service name** in `docker-compose.yml` (in our case it
+    is called `pg`). The same applies to `APP_CONFIG__REDIS__HOST`, its value should be identical to the one defined in
+    `docker-compose.yml` (in our case that’s `redis`).
+
+    You can check the SMTP server configuration
+    guide [here](https://yandex.com/support/yandex-360/customers/mail/en/mail-clients/others#smtpsetting)
+
+    ⚠️ I deliberately added `private.pem` and `public.pem` to the certificates directory so you don’t have to create them
+    yourself. However, if you want to generate your own certificates, you can do so using the following commands:
 
     <details>
     <summary>Creating certificates</summary>
@@ -77,7 +91,10 @@ This is an educational REST API implemented using FastAPI. The project is in dev
 
 5. **Try the app:**
 
-    Open [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs) (you may need to replace the URL with your own host and port if you’re using different settings in your `.env`) to view the Swagger documentation. I recommend interacting with the API using **Postman** or similar tools, because for some reason Swagger can’t correctly pass JWTs into my OAuth2Scheme.
+    Open [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs) (you may need to replace the URL with your own host and
+    port if you’re using different settings in your `.env`) to view the Swagger documentation. I recommend interacting
+    with the API using **Postman** or similar tools, because for some reason Swagger can’t correctly pass JWTs into my
+    OAuth2Scheme.
 
 ## Features
 
@@ -92,6 +109,24 @@ This is an educational REST API implemented using FastAPI. The project is in dev
 
 ## Running tests
 
-```bash
-pytest tests
-```
+1. **Create and activate virtual environment:**
+    
+    - Linux:
+    ```bash
+    python3 -m venv .venv && source .venv/bin/activate
+    ```
+   
+    - Windows:
+    ```bash
+    python -m venv .venv && .venv\scripts\activate
+    ```
+
+2. **Install requirements:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3. **Run the tests:**
+    ```bash
+    pytest tests
+    ```
