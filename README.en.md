@@ -91,10 +91,8 @@ new endpoints, refine the code structure, and add more functionality.
 
 5. **Try the app:**
 
-    Open [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs) (you may need to replace the URL with your own host and
-    port if you’re using different settings in your `.env`) to view the Swagger documentation. I recommend interacting
-    with the API using **Postman** or similar tools, because for some reason Swagger can’t correctly pass JWTs into my
-    OAuth2Scheme.
+    Open [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs) (you have to replace the URL with your host and
+    port if you’re using different settings in your `.env`) to view the Swagger documentation.
 
 ## Features
 
