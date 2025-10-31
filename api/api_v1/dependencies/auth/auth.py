@@ -1,5 +1,5 @@
 from fastapi import Depends, Cookie
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,6 @@ from api.api_v1.dependencies.database.redis_helper import redis_helper
 from api.api_v1.exceptions.http_exceptions import (
     InvalidCredentials,
 )
-from api.api_v1.schemas.user import UserLoginScheme
 from api.api_v1.utils.database import (
     get_user_by_username_or_email,
 )
@@ -31,12 +30,12 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 
 async def get_and_verify_user_from_form(
-    user_data: UserLoginScheme = Depends(UserLoginScheme.as_form),
+    user_data: OAuth2PasswordRequestForm = Depends(OAuth2PasswordRequestForm),
     session: AsyncSession = Depends(db_helper.get_session),
 ) -> User:
     user = await get_user_by_username_or_email(
-        username=user_data.username_or_email,
-        email=user_data.username_or_email,
+        username=user_data.username,
+        email=user_data.username,
         session=session,
     )
     if user is None:

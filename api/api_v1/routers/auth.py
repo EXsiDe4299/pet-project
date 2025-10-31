@@ -32,7 +32,6 @@ from api.api_v1.schemas.auth_responses import (
     ResetPasswordResponse,
     ForgotPasswordResponse,
 )
-from api.api_v1.schemas.user import UserRegistrationScheme
 from api.api_v1.utils.cache import add_token_to_blacklist
 from api.api_v1.utils.database import (
     confirm_user_email,
@@ -68,22 +67,37 @@ auth_router = APIRouter(
     response_model=RegistrationResponse,
 )
 async def registration_endpoint(
-    user_data: UserRegistrationScheme = Depends(UserRegistrationScheme.as_form),
+    username: str = Form(
+        default="",
+        min_length=3,
+        max_length=20,
+        pattern="[a-zA-Z0-9]+",
+    ),
+    email: EmailStr = Form(
+        default="",
+        pattern="^\S+@\S+\.\S+$",
+    ),
+    password: str = Form(
+        default="",
+        min_length=6,
+        max_length=100,
+        pattern="^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$",
+    ),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     existing_user = await get_user_by_username_or_email(
-        username=user_data.username,
-        email=user_data.email,
+        username=username,
+        email=email,
         session=session,
     )
     if existing_user:
         raise AlreadyRegistered()
 
-    hashed_password = hash_password(password=user_data.password)
+    hashed_password = hash_password(password=password)
     await create_user_with_tokens(
-        username=user_data.username,
+        username=username,
         hashed_password=hashed_password,
-        email=user_data.email,
+        email=email,
         session=session,
     )
 
