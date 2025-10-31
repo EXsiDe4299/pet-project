@@ -8,8 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class RunConfig(BaseModel):
-    host: str = "0.0.0.0"
-    port: int = 8000
+    host: str
+    port: int
 
 
 class DatabaseConfig(BaseModel):
@@ -185,7 +185,7 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         env_prefix="APP_CONFIG__",
     )
-    run: RunConfig = RunConfig()
+    run: RunConfig
     db: DatabaseConfig
     redis: RedisConfig
     log: LoggingConfig = LoggingConfig()
