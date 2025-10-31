@@ -22,7 +22,7 @@ async def verify_admin_dependency(
 
 async def validate_user_modification_dependency(
     target_user: User = Depends(get_user_by_username_dependency),
-    current_user: User = Depends(get_user_from_access_token),
+    current_user: User = Depends(verify_admin_dependency),
 ) -> User:
     if current_user.username == target_user.username:
         raise CannotModifySelf()
@@ -33,7 +33,5 @@ async def validate_user_modification_dependency(
     elif current_user.role == Role.ADMIN:
         if target_user.role != Role.USER:
             raise AdminCanModifyOnlyUsers()
-    else:
-        raise AdminOrSuperAdminRequired()
 
     return target_user
