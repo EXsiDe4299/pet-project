@@ -111,20 +111,20 @@ new endpoints, refine the code structure, and add more functionality.
     
     - Linux:
     ```bash
-    python3 -m venv .venv && source .venv/bin/activate
+    uv venv && source .venv/bin/activate
     ```
    
     - Windows:
     ```bash
-    python -m venv .venv && .venv\scripts\activate
+    uv venv && .venv\scripts\activate
     ```
 
 2. **Install requirements:**
     ```bash
-    pip install -r requirements.txt
+    uv sync
     ```
 
 3. **Run the tests:**
     ```bash
-    pytest tests
+    uv run pytest
     ```

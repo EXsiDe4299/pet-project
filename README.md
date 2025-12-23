@@ -111,20 +111,20 @@
 
     - Linux:
     ```bash
-    python3 -m venv .venv && source .venv/bin/activate
+    uv venv && source .venv/bin/activate
     ```
     
     - Windows:
     ```bash
-    python -m venv .venv && .venv\scripts\activate
+    uv venv && .venv\scripts\activate
     ```
     
 2. **Установите зависимости:**
     ```bash
-    pip install -r requirements.txt
+    uv sync
     ```
 
 3. **Запустите тесты:**
     ```bash
-    pytest tests
+    uv run pytest
     ```
