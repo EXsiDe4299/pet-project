@@ -1250,7 +1250,7 @@ class TestEmail:
             message = args[1]
             assert isinstance(message, MessageSchema)
             assert message.subject == subject
-            assert message.recipients == [email_address]
+            assert message.recipients[0].email == email_address
             assert message.body == body
             assert message.subtype == MessageType.plain
             assert args[2] is None
