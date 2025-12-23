@@ -1,18 +1,20 @@
 FROM python:3.12.3-bookworm
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 ENV PYTHONBUFFERED=1
+
+ENV UV_NO_DEV=1
 
 WORKDIR /app
 
-RUN pip install --upgrade pip
+COPY pyproject.toml ./pyproject.toml
 
-COPY requirements.txt ./requirements.txt
+RUN uv sync
 
-RUN pip install -r requirements.txt
-
-COPY . .
+COPY . /app
 
 RUN chmod +x prestart.sh
 
 ENTRYPOINT ["./prestart.sh"]
-CMD ["python3", "main.py"]
+CMD ["uv", "run", "main.py"]

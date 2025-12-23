@@ -3,7 +3,7 @@
 set -e
 
 echo "Apply migrations..."
-alembic upgrade head
+uv run alembic upgrade head
 echo "Migrations applied"
 
 exec "$@"
