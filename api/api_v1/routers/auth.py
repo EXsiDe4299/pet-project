@@ -1,4 +1,5 @@
 import datetime
+import re
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Form
 from pydantic import EmailStr
@@ -71,17 +72,17 @@ async def registration_endpoint(
         default="",
         min_length=3,
         max_length=20,
-        pattern="[a-zA-Z0-9]+",
+        pattern=re.compile("[a-zA-Z0-9]+"),
     ),
     email: EmailStr = Form(
         default="",
-        pattern="^\S+@\S+\.\S+$",
+        pattern=re.compile("^\S+@\S+\.\S+$"),
     ),
     password: str = Form(
         default="",
         min_length=6,
         max_length=100,
-        pattern="^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$",
+        pattern=re.compile("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"),
     ),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
