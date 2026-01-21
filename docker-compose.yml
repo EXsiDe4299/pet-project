@@ -51,3 +51,8 @@ services:
       - ./certificates:/etc/nginx/ssl
     depends_on:
       - app
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
