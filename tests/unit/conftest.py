@@ -20,6 +20,23 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def mock_jwt_keys():
+    private_key_content = "mock private key"
+    public_key_content = "mock public key"
+
+    def mock_read_text(self):
+        path_str = str(self)
+        if "private" in path_str:
+            return private_key_content
+        elif "public" in path_str:
+            return public_key_content
+        return private_key_content
+
+    with patch("pathlib.Path.read_text", side_effect=mock_read_text, autospec=True):
+        yield
+
+
 @pytest.fixture()
 def mock_db_session() -> AsyncMock:
     return AsyncMock(spec=AsyncSession)
