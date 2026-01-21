@@ -39,50 +39,10 @@ new endpoints, refine the code structure, and add more functionality.
 
     The value of `APP_CONFIG__DB__HOST` must exactly **match the service name** in `docker-compose.yml` (in our case it
     is called `pg`). The same applies to `APP_CONFIG__REDIS__HOST`, its value should be identical to the one defined in
-    `docker-compose.yml` (in our case that’s `redis`).
+    `docker-compose.yml` (in our case that’s `redis`). Also, if you want to change the port value, you should change it 
+    in the `nginx.conf` file as well.
 
-    You can check the SMTP server configuration
-    guide [here](https://yandex.com/support/yandex-360/customers/mail/en/mail-clients/others#smtpsetting)
-
-    ⚠️ I deliberately added `private.pem` and `public.pem` to the certificates directory so you don’t have to create them
-    yourself. However, if you want to generate your own certificates, you can do so using the following commands:
-
-    <details>
-    <summary>Creating certificates</summary>
-    <ol>
-    <ul>
-
-    Go to the certificates directory
-    ```bash
-    cd certificates
-    ```
-    </ul>
-    
-    <ul>
-
-    Generate a private key
-    ```bash
-    openssl genrsa -out private.pem 2048
-    ```
-    </ul>
-
-    <ul>
-    
-    Extract a public key from the private key
-    ```bash
-    openssl rsa -in private.pem -outform PEM -pubout -out public.pem
-    ```
-    </ul>
-
-    <ul>
-    
-    Go back to the project's root directory
-    ```bash
-    cd ..
-    ```
-    </ul>
-    </ol>
-    </details>
+    You can check the SMTP server configuration guide [here](https://yandex.com/support/yandex-360/customers/mail/en/mail-clients/others#smtpsetting)
 
 4. **Run Docker Compose:**
     ```bash
@@ -91,8 +51,9 @@ new endpoints, refine the code structure, and add more functionality.
 
 5. **Try the app:**
 
-    Open [http://0.0.0.0:8000/docs](http://0.0.0.0:8000/docs) (you have to replace the URL with your host and
-    port if you’re using different settings in your `.env`) to view the Swagger documentation.
+    Open https://localhost/docs to view the Swagger documentation. You might see a message stating that a secure 
+    connection cannot be established. This is normal because the project uses self-signed SSL certificates. Just click
+    on the "More details" button, and then on "Continue to site".
 
 ## Features
 
@@ -104,6 +65,7 @@ new endpoints, refine the code structure, and add more functionality.
 - **Email letters** – [FastapiMail](https://github.com/sabuhish/fastapi-mail) (confirmation codes)
 - **Testing** – Pytest
 - **Containerization** – Docker + Docker compose
+- **Reverse proxy** – Nginx
 
 ## Running tests
 
