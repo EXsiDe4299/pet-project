@@ -9,10 +9,16 @@ from core.models import User
 
 def encode_jwt(
     payload: dict,
-    private_key: str = settings.jwt_auth.private_key_path.read_text(),
+    private_key: str | None = None,
     algorithm: str = settings.jwt_auth.algorithm,
     expire_minutes: int = settings.jwt_auth.access_token_expire_minutes,
 ) -> str:
+    private_key = (
+        settings.jwt_auth.private_key_path.read_text()
+        if private_key is None
+        else private_key
+    )
+
     to_encode = payload.copy()
     now = datetime.datetime.now(datetime.UTC)
     expire = now + datetime.timedelta(minutes=expire_minutes)
@@ -31,9 +37,15 @@ def encode_jwt(
 
 def decode_jwt(
     token: str | bytes,
-    public_key: str = settings.jwt_auth.public_key_path.read_text(),
+    public_key: str | None = None,
     algorithm: str = settings.jwt_auth.algorithm,
 ) -> dict:
+    public_key = (
+        settings.jwt_auth.public_key_path.read_text()
+        if public_key is None
+        else public_key
+    )
+
     decoded = jwt.decode(
         jwt=token,
         key=public_key,
