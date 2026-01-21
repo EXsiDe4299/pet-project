@@ -31,6 +31,8 @@ services:
       - "${APP_CONFIG__RUN__PORT}:${APP_CONFIG__RUN__PORT}"
     env_file:
       - ".env"
+    volumes:
+      - ./certificates:/app/certificates
     depends_on:
       pg:
         condition: service_healthy
