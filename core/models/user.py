@@ -25,11 +25,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
     hashed_password: Mapped[bytes] = mapped_column(nullable=False)
-    bio: Mapped[str] = mapped_column(
+    bio: Mapped[str | None] = mapped_column(
         Text(),
         nullable=True,
     )
-    avatar_name: Mapped[str] = mapped_column(nullable=True)
+    avatar_name: Mapped[str | None] = mapped_column(nullable=True)
     is_active: Mapped[bool] = mapped_column(
         nullable=False,
         default=True,

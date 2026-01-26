@@ -2,12 +2,15 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
+from api.api_v1.exceptions.http_exceptions import InvalidAvatarFormat
 from fastapi import UploadFile
 
 from core.config import settings
 
 
 async def save_avatar(avatar: UploadFile, username: str) -> str:
+    if avatar.filename is None:
+        raise InvalidAvatarFormat()
     avatar_name = username + Path(avatar.filename).suffix
     avatar_path = settings.avatar.avatars_dir / avatar_name
     try:

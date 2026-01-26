@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 from asyncio import AbstractEventLoop
+from typing import Generator
 from unittest.mock import AsyncMock, Mock, MagicMock, patch
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture(scope="session")
-def event_loop(request) -> AbstractEventLoop:
+def event_loop(request) -> Generator[AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
@@ -21,7 +22,7 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture(autouse=True)
-def mock_jwt_keys():
+def mock_jwt_keys() -> Generator[None, None, None]:
     private_key_content = "mock private key"
     public_key_content = "mock public key"
 
@@ -48,13 +49,13 @@ def mock_background_tasks() -> Mock:
 
 
 @pytest.fixture()
-def mock_fastmail() -> MagicMock:
+def mock_fastmail() -> Generator[MagicMock, None, None]:
     with patch("api.api_v1.utils.email.fm") as mock:
         yield mock
 
 
 @pytest.fixture()
-def mock_datetime_now(monkeypatch):
+def mock_datetime_now(monkeypatch) -> datetime.datetime:
     fixed_now = datetime.datetime(
         year=2025,
         month=1,

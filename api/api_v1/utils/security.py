@@ -4,6 +4,7 @@ from pathlib import Path
 
 import bcrypt
 from PIL import Image
+from api.api_v1.exceptions.http_exceptions import InvalidAvatarFormat
 from fastapi import UploadFile
 
 from core.config import settings
@@ -32,6 +33,8 @@ def generate_email_token(length: int = settings.email_tokens.token_length) -> st
 
 
 def validate_avatar_extension(avatar: UploadFile) -> bool:
+    if avatar.filename is None:
+        raise InvalidAvatarFormat()
     avatar_extension = Path(avatar.filename).suffix.lower()
     return avatar_extension in settings.avatar.allowed_extensions_to_mime.keys()
 

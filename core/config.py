@@ -1,5 +1,6 @@
 import logging
 import string
+from enum import Enum
 from pathlib import Path
 from typing import Literal
 
@@ -104,7 +105,7 @@ class V1RouterConfig(BaseModel):
 
 class AuthRouterConfig(BaseModel):
     prefix: str = "/auth"
-    tags: list[str] = ["Auth"]
+    tags: list[str | Enum] = ["Auth"]
     registration_endpoint_path: str = "/register"
     confirm_email_endpoint_path: str = "/confirm-email"
     login_endpoint_path: str = "/login"
@@ -117,7 +118,7 @@ class AuthRouterConfig(BaseModel):
 
 class StoriesRouterConfig(BaseModel):
     prefix: str = "/stories"
-    tags: list[str] = ["Stories"]
+    tags: list[str | Enum] = ["Stories"]
     get_stories_endpoint_path: str = "/all"
     get_story_endpoint_path: str = "/{story_uuid}"
     get_stories_by_name_or_text_endpoint_path: str = "/search"
@@ -130,7 +131,7 @@ class StoriesRouterConfig(BaseModel):
 
 class UsersRouterConfig(BaseModel):
     prefix: str = "/users"
-    tags: list[str] = ["Users"]
+    tags: list[str | Enum] = ["Users"]
     get_user_endpoint_path: str = "/"
     get_profile_endpoint_path: str = "/profile"
     edit_profile_endpoint_path: str = "/edit-profile"
@@ -139,7 +140,7 @@ class UsersRouterConfig(BaseModel):
 
 class AdminRouterConfig(BaseModel):
     prefix: str = "/admin"
-    tags: list[str] = ["Admin"]
+    tags: list[str | Enum] = ["Admin"]
     get_active_users_endpoint_path: str = "/active-users"
     get_inactive_users_endpoint_path: str = "/inactive-users"
     make_admin_endpoint_path: str = "/make-admin"
@@ -202,4 +203,4 @@ class Settings(BaseSettings):
     avatar: AvatarConfig = AvatarConfig()
 
 
-settings: Settings = Settings()
+settings: Settings = Settings()  # pyright: ignore

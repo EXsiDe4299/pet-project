@@ -28,7 +28,7 @@ async def _validate_and_decode_token(
         raise InvalidJWTType()
 
     jti = token_payload.get("jti")
-    if await is_token_in_blacklist(jti=jti, cache=cache):
+    if jti is None or await is_token_in_blacklist(jti=jti, cache=cache):
         raise InvalidJWT()
 
     return token_payload
@@ -46,6 +46,9 @@ async def _get_user_from_token(
         cache=cache,
     )
     email = token_payload.get("sub")
+    if email is None:
+        raise InvalidJWT()
+
     user = await get_user_by_username_or_email(email=email, session=session)
     if user is None:
         raise InvalidJWT()

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from api.api_v1.exceptions.http_exceptions import InvalidAvatarFormat
 from fastapi import APIRouter, Depends, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -60,6 +61,9 @@ async def edit_profile_endpoint(
             avatar=avatar,
             username=user.username,
         )
+
+        if avatar.filename is None:
+            raise InvalidAvatarFormat()
 
         avatar_extension = Path(avatar.filename).suffix.lower()
         if user.avatar_name and not user.avatar_name.lower().endswith(avatar_extension):

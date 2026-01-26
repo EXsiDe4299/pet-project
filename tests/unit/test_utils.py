@@ -313,6 +313,7 @@ class TestDatabase:
             expected_expiration = datetime.datetime.now(
                 datetime.UTC
             ) + datetime.timedelta(minutes=expire_minutes)
+            assert updated_tokens.email_verification_token_exp is not None
             expiration_time_diff = abs(
                 (
                     updated_tokens.email_verification_token_exp - expected_expiration
@@ -364,6 +365,7 @@ class TestDatabase:
             expected_expiration = datetime.datetime.now(
                 datetime.UTC
             ) + datetime.timedelta(minutes=expire_minutes)
+            assert updated_tokens.forgot_password_token_exp is not None
             expiration_time_diff = abs(
                 (
                     updated_tokens.forgot_password_token_exp - expected_expiration
@@ -640,6 +642,7 @@ class TestDatabase:
                 session=mock_db_session,
             )
             mock_db_session.execute.assert_awaited_once()
+            assert story is not None
             assert story.id == story_id
 
         async def test_not_found(

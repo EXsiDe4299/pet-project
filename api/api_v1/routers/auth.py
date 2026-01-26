@@ -72,11 +72,11 @@ async def registration_endpoint(
         default="",
         min_length=3,
         max_length=20,
-        pattern=re.compile("[a-zA-Z0-9]+"),
+        pattern=re.compile("[a-zA-Z0-9]+"),  # pyright: ignore
     ),
     email: EmailStr = Form(
         default="",
-        pattern=re.compile("^\S+@\S+\.\S+$"),
+        pattern=re.compile("^\S+@\S+\.\S+$"),  # pyright: ignore
     ),
     password: str = Form(
         default="",
@@ -84,7 +84,7 @@ async def registration_endpoint(
         max_length=100,
         pattern=re.compile(
             "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
-        ),
+        ),  # pyright: ignore
     ),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
@@ -155,7 +155,9 @@ async def confirm_email_endpoint(
         raise InvalidConfirmEmailCode()
     if user.is_email_verified:
         raise EmailAlreadyVerified()
-    if user.tokens.email_verification_token_exp < datetime.datetime.now(datetime.UTC):
+
+    token_exp = user.tokens.email_verification_token_exp
+    if token_exp is None or token_exp < datetime.datetime.now(datetime.UTC):
         raise InvalidConfirmEmailCode()
 
     await confirm_user_email(
@@ -225,7 +227,9 @@ async def change_password_endpoint(
         raise InvalidEmail()
     if not user.is_active:
         raise InactiveUser()
-    if user.tokens.forgot_password_token_exp < datetime.datetime.now(datetime.UTC):
+
+    token_exp = user.tokens.forgot_password_token_exp
+    if token_exp is None or token_exp < datetime.datetime.now(datetime.UTC):
         raise InvalidChangePasswordCode()
 
     new_hashed_password = hash_password(password=new_password)

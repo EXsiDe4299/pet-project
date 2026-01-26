@@ -1,3 +1,4 @@
+from api.api_v1.exceptions.http_exceptions import InvalidJWT
 from redis.asyncio import Redis
 
 
@@ -7,6 +8,8 @@ async def add_token_to_blacklist(
 ) -> None:
     jti = payload.get("jti")
     exp = payload.get("exp")
+    if jti is None or exp is None:
+        raise InvalidJWT()
     await cache.set(name=jti, value="", exat=exp)
 
 
