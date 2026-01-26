@@ -82,7 +82,9 @@ async def registration_endpoint(
         default="",
         min_length=6,
         max_length=100,
-        pattern=re.compile("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"),
+        pattern=re.compile(
+            "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
+        ),
     ),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
