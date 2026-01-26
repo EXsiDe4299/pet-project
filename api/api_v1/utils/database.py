@@ -343,7 +343,7 @@ async def get_inactive_users(
     offset = (page - 1) * per_page
     stmt = (
         select(User)
-        .where(User.is_active == False)
+        .where(~User.is_active)
         .order_by(User.registered_at.desc())
         .offset(offset)
         .limit(per_page)

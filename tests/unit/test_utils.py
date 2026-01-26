@@ -744,9 +744,9 @@ class TestDatabase:
             mock_db_session.execute.assert_awaited_once()
             assert len(active_users) == 2
             assert active_users[0].username == "user1"
-            assert active_users[0].is_active == True
+            assert active_users[0].is_active
             assert active_users[1].username == "user2"
-            assert active_users[1].is_active == True
+            assert active_users[1].is_active
 
         async def test_empty_result(
             self,
@@ -790,9 +790,9 @@ class TestDatabase:
             mock_db_session.execute.assert_awaited_once()
             assert len(inactive_users) == 2
             assert inactive_users[0].username == "user1"
-            assert inactive_users[0].is_active == False
+            assert not inactive_users[0].is_active
             assert inactive_users[1].username == "user2"
-            assert inactive_users[1].is_active == False
+            assert not inactive_users[1].is_active
 
         async def test_empty_result(
             self,
@@ -898,7 +898,7 @@ class TestDatabase:
             mock_db_session.rollback.assert_not_awaited()
 
             assert isinstance(blocked_user, User)
-            assert blocked_user.is_active == False
+            assert not blocked_user.is_active
 
         async def test_with_exception(
             self,
@@ -934,7 +934,7 @@ class TestDatabase:
             mock_db_session.rollback.assert_not_awaited()
 
             assert isinstance(unblocked_user, User)
-            assert unblocked_user.is_active == True
+            assert unblocked_user.is_active
 
         async def test_with_exception(
             self,
