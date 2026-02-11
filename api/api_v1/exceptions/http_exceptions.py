@@ -173,7 +173,7 @@ class UserNotFound(HTTPException):
 class UnsupportedAvatarExtension(HTTPException):
     def __init__(
         self,
-        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code: int = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
         detail: str = "Unsupported avatar extension",
     ):
         super().__init__(

@@ -122,7 +122,6 @@ class StoriesRouterConfig(BaseModel):
     get_stories_endpoint_path: str = "/all"
     get_story_endpoint_path: str = "/{story_uuid}"
     get_stories_by_name_or_text_endpoint_path: str = "/search"
-    get_author_stories_endpoint_path: str = "/"
     create_story_endpoint_path: str = "/"
     edit_story_endpoint_path: str = "/{story_uuid}"
     delete_story_endpoint_path: str = "/{story_uuid}"
@@ -132,10 +131,11 @@ class StoriesRouterConfig(BaseModel):
 class UsersRouterConfig(BaseModel):
     prefix: str = "/users"
     tags: list[str | Enum] = ["Users"]
-    get_user_endpoint_path: str = "/"
-    get_profile_endpoint_path: str = "/profile"
-    edit_profile_endpoint_path: str = "/edit-profile"
-    get_avatar_endpoint_path: str = "/avatar"
+    get_profile_endpoint_path: str = "/me"
+    get_liked_stories_endpoint_path: str = "/me/liked-stories"
+    get_user_endpoint_path: str = "/{username}"
+    edit_profile_endpoint_path: str = "/me"
+    get_avatar_endpoint_path: str = "/{username}/avatar"
 
 
 class AdminRouterConfig(BaseModel):

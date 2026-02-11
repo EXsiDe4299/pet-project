@@ -3,15 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from api.api_v1.dependencies.admin import (
-    verify_admin_dependency,
-    validate_user_modification_dependency,
+    verify_admin,
+    validate_user_modification_with_target_stories,
 )
 from api.api_v1.dependencies.database.db_helper import db_helper
-from api.api_v1.exceptions.http_exceptions import (
-    UserAlreadyBlocked,
-    UserIsNotBlocked,
-)
-from api.api_v1.schemas.user import UserScheme
+from api.api_v1.exceptions.http_exceptions import UserAlreadyBlocked, UserIsNotBlocked
+from api.api_v1.schemas.user import UserWithStoriesScheme, UserScheme
 from api.api_v1.utils.database import (
     get_active_users,
     get_inactive_users,
@@ -35,7 +32,7 @@ admin_router = APIRouter(
     status_code=status.HTTP_200_OK,
 )
 async def get_active_users_endpoint(
-    _: User = Depends(verify_admin_dependency),
+    _: User = Depends(verify_admin),
     session: AsyncSession = Depends(db_helper.get_session),
     page: int = 1,
 ):
@@ -52,7 +49,7 @@ async def get_active_users_endpoint(
     status_code=status.HTTP_200_OK,
 )
 async def get_inactive_users_endpoint(
-    _: User = Depends(verify_admin_dependency),
+    _: User = Depends(verify_admin),
     session: AsyncSession = Depends(db_helper.get_session),
     page: int = 1,
 ):
@@ -65,11 +62,11 @@ async def get_inactive_users_endpoint(
 
 @admin_router.put(
     settings.admin_router.make_admin_endpoint_path,
-    response_model=UserScheme,
+    response_model=UserWithStoriesScheme,
     status_code=status.HTTP_200_OK,
 )
 async def make_admin_endpoint(
-    target_user: User = Depends(validate_user_modification_dependency),
+    target_user: User = Depends(validate_user_modification_with_target_stories),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     new_admin = await make_admin(user=target_user, session=session)
@@ -78,11 +75,11 @@ async def make_admin_endpoint(
 
 @admin_router.put(
     settings.admin_router.demote_admin_endpoint_path,
-    response_model=UserScheme,
+    response_model=UserWithStoriesScheme,
     status_code=status.HTTP_200_OK,
 )
 async def demote_admin_endpoint(
-    target_user: User = Depends(validate_user_modification_dependency),
+    target_user: User = Depends(validate_user_modification_with_target_stories),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     demoted_admin = await demote_admin(user=target_user, session=session)
@@ -91,11 +88,11 @@ async def demote_admin_endpoint(
 
 @admin_router.put(
     settings.admin_router.block_user_endpoint_path,
-    response_model=UserScheme,
+    response_model=UserWithStoriesScheme,
     status_code=status.HTTP_200_OK,
 )
 async def block_user_endpoint(
-    target_user: User = Depends(validate_user_modification_dependency),
+    target_user: User = Depends(validate_user_modification_with_target_stories),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     if not target_user.is_active:
@@ -106,11 +103,11 @@ async def block_user_endpoint(
 
 @admin_router.put(
     settings.admin_router.unblock_user_endpoint_path,
-    response_model=UserScheme,
+    response_model=UserWithStoriesScheme,
     status_code=status.HTTP_200_OK,
 )
 async def unblock_user_endpoint(
-    target_user: User = Depends(validate_user_modification_dependency),
+    target_user: User = Depends(validate_user_modification_with_target_stories),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     if target_user.is_active:

@@ -9,50 +9,40 @@ from starlette import status
 from starlette.responses import Response
 
 from api.api_v1.dependencies.auth import (
+    get_user_from_form,
+    get_user_from_form_with_tokens,
     get_user_from_refresh_token,
     get_payload_from_access_token,
-    get_and_verify_user_from_form,
 )
 from api.api_v1.dependencies.database.db_helper import db_helper
 from api.api_v1.dependencies.database.redis_helper import redis_helper
 from api.api_v1.exceptions.http_exceptions import (
     AlreadyRegistered,
-    EmailAlreadyVerified,
     InvalidConfirmEmailCode,
-    InactiveUser,
     InvalidEmail,
+    InactiveUser,
     InvalidChangePasswordCode,
+    EmailAlreadyVerified,
 )
 from api.api_v1.schemas.auth_responses import (
+    StatusSuccessResponse,
     LoginResponse,
-    LogoutResponse,
-    RegistrationResponse,
     RefreshResponse,
-    ConfirmEmailResponse,
-    SendingEmailTokenResponse,
-    ResetPasswordResponse,
-    ForgotPasswordResponse,
 )
 from api.api_v1.utils.cache import add_token_to_blacklist
 from api.api_v1.utils.database import (
-    confirm_user_email,
-    update_user_email_verification_token,
-    update_forgot_password_token,
-    change_user_password,
-    create_user_with_tokens,
     get_user_by_username_or_email,
+    update_user_email_verification_token,
     get_user_by_email_verification_token,
+    confirm_user_email,
+    update_forgot_password_token,
+    create_user_with_tokens,
     get_user_by_forgot_password_token,
+    change_user_password,
 )
 from api.api_v1.utils.email import send_plain_message_to_email
-from api.api_v1.utils.jwt_auth import (
-    create_access_token,
-    create_refresh_token,
-)
-from api.api_v1.utils.security import (
-    hash_password,
-    generate_email_token,
-)
+from api.api_v1.utils.jwt_auth import create_access_token, create_refresh_token
+from api.api_v1.utils.security import hash_password, generate_email_token
 from core.config import settings
 from core.models import User
 
@@ -65,23 +55,24 @@ auth_router = APIRouter(
 @auth_router.post(
     settings.auth_router.registration_endpoint_path,
     status_code=status.HTTP_201_CREATED,
-    response_model=RegistrationResponse,
+    response_model=StatusSuccessResponse,
 )
 async def registration_endpoint(
     username: str = Form(
         default="",
         min_length=3,
-        max_length=20,
+        max_length=150,
         pattern=re.compile("[a-zA-Z0-9]+"),  # pyright: ignore
     ),
     email: EmailStr = Form(
         default="",
+        max_length=150,
         pattern=re.compile("^\S+@\S+\.\S+$"),  # pyright: ignore
     ),
     password: str = Form(
         default="",
         min_length=6,
-        max_length=100,
+        max_length=150,
         pattern=re.compile(
             "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
         ),  # pyright: ignore
@@ -104,17 +95,17 @@ async def registration_endpoint(
         session=session,
     )
 
-    return RegistrationResponse()
+    return StatusSuccessResponse()
 
 
 @auth_router.post(
     settings.auth_router.send_email_token_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=SendingEmailTokenResponse,
+    response_model=StatusSuccessResponse,
 )
 async def send_email_verification_token_endpoint(
     background_tasks: BackgroundTasks,
-    user: User = Depends(get_and_verify_user_from_form),
+    user: User = Depends(get_user_from_form_with_tokens),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
     if user.is_email_verified:
@@ -122,8 +113,8 @@ async def send_email_verification_token_endpoint(
 
     email_verification_token = generate_email_token()
 
-    updated_tokens = await update_user_email_verification_token(
-        user_tokens=user.tokens,
+    updated_user = await update_user_email_verification_token(
+        user=user,
         email_verification_token=email_verification_token,
         session=session,
     )
@@ -131,16 +122,16 @@ async def send_email_verification_token_endpoint(
     send_plain_message_to_email(
         subject="Email Verification",
         email_address=user.email,
-        body=updated_tokens.email_verification_token,
+        body=updated_user.tokens.email_verification_token,
         background_tasks=background_tasks,
     )
-    return SendingEmailTokenResponse()
+    return StatusSuccessResponse()
 
 
 @auth_router.post(
     settings.auth_router.confirm_email_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=ConfirmEmailResponse,
+    response_model=StatusSuccessResponse,
 )
 async def confirm_email_endpoint(
     email_verification_token: str = Form(default=""),
@@ -150,6 +141,7 @@ async def confirm_email_endpoint(
     user = await get_user_by_email_verification_token(
         email_verification_token=email_verification_token,
         session=session,
+        load_tokens=True,
     )
     if user is None:
         raise InvalidConfirmEmailCode()
@@ -165,13 +157,13 @@ async def confirm_email_endpoint(
         session=session,
     )
 
-    return ConfirmEmailResponse()
+    return StatusSuccessResponse()
 
 
 @auth_router.post(
     settings.auth_router.forgot_password_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=ForgotPasswordResponse,
+    response_model=StatusSuccessResponse,
 )
 async def forgot_password_endpoint(
     background_tasks: BackgroundTasks,
@@ -181,6 +173,7 @@ async def forgot_password_endpoint(
     user = await get_user_by_username_or_email(
         email=email,
         session=session,
+        load_tokens=True,
     )
     if user is None:
         raise InvalidEmail()
@@ -190,8 +183,8 @@ async def forgot_password_endpoint(
         raise InactiveUser()
 
     forgot_password_token = generate_email_token()
-    updated_tokens = await update_forgot_password_token(
-        user_tokens=user.tokens,
+    updated_user = await update_forgot_password_token(
+        user=user,
         forgot_password_token=forgot_password_token,
         session=session,
     )
@@ -199,17 +192,17 @@ async def forgot_password_endpoint(
     send_plain_message_to_email(
         subject="Resetting password",
         email_address=user.email,
-        body=updated_tokens.forgot_password_token,
+        body=updated_user.tokens.forgot_password_token,
         background_tasks=background_tasks,
     )
 
-    return ForgotPasswordResponse()
+    return StatusSuccessResponse()
 
 
 @auth_router.post(
     settings.auth_router.change_password_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=ResetPasswordResponse,
+    response_model=StatusSuccessResponse,
 )
 async def change_password_endpoint(
     new_password: str = Form(min_length=3, max_length=100, default=""),
@@ -220,6 +213,7 @@ async def change_password_endpoint(
     user = await get_user_by_forgot_password_token(
         forgot_password_token=forgot_password_token,
         session=session,
+        load_tokens=True,
     )
     if user is None:
         raise InvalidChangePasswordCode()
@@ -238,7 +232,7 @@ async def change_password_endpoint(
         new_hashed_password=new_hashed_password,
         session=session,
     )
-    return ResetPasswordResponse()
+    return StatusSuccessResponse()
 
 
 @auth_router.post(
@@ -248,7 +242,7 @@ async def change_password_endpoint(
 )
 async def login_endpoint(
     response: Response,
-    user: User = Depends(get_and_verify_user_from_form),
+    user: User = Depends(get_user_from_form),
 ):
     if not user.is_active:
         raise InactiveUser()
@@ -310,7 +304,7 @@ async def refresh_jwt_endpoint(
 @auth_router.post(
     settings.auth_router.logout_endpoint_path,
     status_code=status.HTTP_200_OK,
-    response_model=LogoutResponse,
+    response_model=StatusSuccessResponse,
 )
 async def logout_endpoint(
     response: Response,
@@ -319,4 +313,4 @@ async def logout_endpoint(
 ):
     await add_token_to_blacklist(payload=access_token_payload, cache=cache)
     response.delete_cookie(settings.cookie.refresh_token_key)
-    return LogoutResponse()
+    return StatusSuccessResponse()
