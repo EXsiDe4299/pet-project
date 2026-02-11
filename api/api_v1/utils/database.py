@@ -1,17 +1,17 @@
 import datetime
 import functools
 import inspect
-from typing import Sequence, Callable
+from typing import Callable, Sequence
 from uuid import UUID
 
 from pydantic import EmailStr
 from sqlalchemy import select, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 from core.config import settings
-from core.models import User, Story
-from core.models.token import Token
+from core.models import User, Token, Story
 from core.models.user import Role
 
 
@@ -29,7 +29,7 @@ def _rollback_if_db_exception(session_param_name: str = "session"):
                 try:
                     session_index = param_names.index(session_param_name)
                     session = args[session_index]
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     pass
 
             if session is None:
@@ -55,8 +55,17 @@ async def get_user_by_username_or_email(
     session: AsyncSession,
     username: str = "",
     email: str | EmailStr = "",
+    load_tokens: bool = False,
+    load_stories: bool = False,
+    load_liked_stories: bool = False,
 ) -> User | None:
     stmt = select(User).where(or_(User.username == username, User.email == email))
+    if load_tokens:
+        stmt = stmt.options(joinedload(User.tokens))
+    if load_stories:
+        stmt = stmt.options(selectinload(User.stories))
+    if load_liked_stories:
+        stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
@@ -65,12 +74,21 @@ async def get_user_by_username_or_email(
 async def get_user_by_email_verification_token(
     email_verification_token: str,
     session: AsyncSession,
+    load_tokens: bool = False,
+    load_stories: bool = False,
+    load_liked_stories: bool = False,
 ) -> User | None:
     stmt = (
         select(User)
         .join(User.tokens)
         .where(Token.email_verification_token == email_verification_token)
     )
+    if load_tokens:
+        stmt = stmt.options(joinedload(User.tokens))
+    if load_stories:
+        stmt = stmt.options(selectinload(User.stories))
+    if load_liked_stories:
+        stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
@@ -79,12 +97,21 @@ async def get_user_by_email_verification_token(
 async def get_user_by_forgot_password_token(
     forgot_password_token: str,
     session: AsyncSession,
+    load_tokens: bool = False,
+    load_stories: bool = False,
+    load_liked_stories: bool = False,
 ) -> User | None:
     stmt = (
         select(User)
         .join(User.tokens)
         .where(Token.forgot_password_token == forgot_password_token)
     )
+    if load_tokens:
+        stmt = stmt.options(joinedload(User.tokens))
+    if load_stories:
+        stmt = stmt.options(selectinload(User.stories))
+    if load_liked_stories:
+        stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
     return user
@@ -92,7 +119,6 @@ async def get_user_by_forgot_password_token(
 
 @_rollback_if_db_exception()
 async def create_user_with_tokens(
-    *,
     username: str,
     hashed_password: bytes,
     email: str | EmailStr,
@@ -103,7 +129,7 @@ async def create_user_with_tokens(
         username=username,
         hashed_password=hashed_password,
     )
-    tokens = Token(email=email)
+    tokens = Token(username=username)
     session.add(new_user)
     session.add(tokens)
     await session.commit()
@@ -111,43 +137,51 @@ async def create_user_with_tokens(
 
 @_rollback_if_db_exception()
 async def update_user_email_verification_token(
-    *,
-    user_tokens: Token,
+    user: User,
     email_verification_token: str,
     session: AsyncSession,
     expire_minutes: int = settings.email_tokens.email_verification_token_exp_minutes,
-) -> Token:
+) -> User:
     email_verification_token_exp = datetime.datetime.now(
         datetime.UTC
     ) + datetime.timedelta(minutes=expire_minutes)
-    user_tokens.email_verification_token = email_verification_token
-    user_tokens.email_verification_token_exp = email_verification_token_exp
+    user.tokens.email_verification_token = email_verification_token
+    user.tokens.email_verification_token_exp = email_verification_token_exp
     await session.commit()
-    await session.refresh(user_tokens)
-    return user_tokens
+    await session.refresh(user)
+    return user
+
+
+@_rollback_if_db_exception()
+async def confirm_user_email(
+    user: User,
+    session: AsyncSession,
+) -> None:
+    user.is_email_verified = True
+    user.tokens.email_verification_token = None
+    user.tokens.email_verification_token_exp = None
+    await session.commit()
 
 
 @_rollback_if_db_exception()
 async def update_forgot_password_token(
-    *,
-    user_tokens: Token,
+    user: User,
     forgot_password_token: str,
     session: AsyncSession,
     expire_minutes: int = settings.email_tokens.forgot_password_token_exp_minutes,
-) -> Token:
+) -> User:
     forgot_password_token_exp = datetime.datetime.now(
         datetime.UTC
     ) + datetime.timedelta(minutes=expire_minutes)
-    user_tokens.forgot_password_token = forgot_password_token
-    user_tokens.forgot_password_token_exp = forgot_password_token_exp
+    user.tokens.forgot_password_token = forgot_password_token
+    user.tokens.forgot_password_token_exp = forgot_password_token_exp
     await session.commit()
-    await session.refresh(user_tokens)
-    return user_tokens
+    await session.refresh(user)
+    return user
 
 
 @_rollback_if_db_exception()
 async def change_user_password(
-    *,
     user: User,
     new_hashed_password: bytes,
     session: AsyncSession,
@@ -160,98 +194,77 @@ async def change_user_password(
     return user
 
 
-@_rollback_if_db_exception()
-async def confirm_user_email(
-    *,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    user.is_email_verified = True
-    user.tokens.email_verification_token = None
-    user.tokens.email_verification_token_exp = None
-    await session.commit()
-
-
 async def get_stories(
     session: AsyncSession,
+    load_author: bool = False,
+    load_likers: bool = False,
     page: int = 1,
     per_page: int = 20,
 ) -> Sequence[Story]:
     offset = (page - 1) * per_page
+    stmt = select(Story)
+    if load_author:
+        stmt = stmt.options(joinedload(Story.author))
+    if load_likers:
+        stmt = stmt.options(selectinload(Story.likers))
     result = await session.execute(
-        select(Story, User)
-        .join(User, User.email == Story.author_email)
-        .order_by(Story.created_at.desc())
-        .offset(offset)
-        .limit(per_page)
+        stmt.order_by(Story.created_at.desc()).offset(offset).limit(per_page)
     )
-    stories = result.unique().scalars().fetchall()
+    stories = result.scalars().fetchall()
     return stories
 
 
 async def get_stories_by_name_or_text(
     query: str,
     session: AsyncSession,
+    load_author: bool = False,
+    load_likers: bool = False,
     page: int = 1,
     per_page: int = 20,
 ) -> Sequence[Story]:
     offset = (page - 1) * per_page
+    stmt = select(Story)
+    if load_author:
+        stmt = stmt.options(joinedload(Story.author))
+    if load_likers:
+        stmt = stmt.options(selectinload(Story.likers))
     result = await session.execute(
-        select(Story, User)
-        .join(User, User.email == Story.author_email)
-        .where(or_(Story.name.ilike(f"%{query}%"), Story.text.ilike(f"%{query}%")))
+        stmt.where(or_(Story.name.ilike(f"%{query}%"), Story.text.ilike(f"%{query}%")))
         .order_by(Story.created_at.desc())
         .offset(offset)
         .limit(per_page)
     )
-    stories = result.unique().scalars().fetchall()
+    stories = result.scalars().fetchall()
     return stories
 
 
 async def get_story_by_uuid(
     story_uuid: UUID,
     session: AsyncSession,
+    load_author: bool = False,
+    load_likers: bool = False,
 ) -> Story | None:
-    result = await session.execute(
-        select(Story, User)
-        .join(User, User.email == Story.author_email)
-        .where(Story.id == story_uuid)
-    )
-    story = result.unique().scalar_one_or_none()
+    stmt = select(Story)
+    if load_author:
+        stmt = stmt.options(joinedload(Story.author))
+    if load_likers:
+        stmt = stmt.options(selectinload(Story.likers))
+    result = await session.execute(stmt.where(Story.id == story_uuid))
+    story = result.scalar_one_or_none()
     return story
-
-
-async def get_author_stories(
-    author_username: str,
-    session: AsyncSession,
-    page: int = 1,
-    per_page: int = 20,
-) -> Sequence[Story]:
-    offset = (page - 1) * per_page
-    result = await session.execute(
-        select(Story, User)
-        .join(User, User.email == Story.author_email)
-        .where(User.username == author_username)
-        .order_by(Story.created_at.desc())
-        .offset(offset)
-        .limit(per_page)
-    )
-    stories = result.unique().scalars().fetchall()
-    return stories
 
 
 @_rollback_if_db_exception()
 async def create_story(
-    *,
     name: str,
     text: str,
-    author_email: str,
+    author_username: str,
     session: AsyncSession,
 ) -> Story:
     new_story = Story(
         name=name,
         text=text,
-        author_email=author_email,
+        author_username=author_username,
     )
     session.add(new_story)
     await session.commit()
@@ -261,7 +274,6 @@ async def create_story(
 
 @_rollback_if_db_exception()
 async def edit_story(
-    *,
     name: str,
     text: str,
     story: Story,
@@ -276,7 +288,6 @@ async def edit_story(
 
 @_rollback_if_db_exception()
 async def delete_story(
-    *,
     story: Story,
     session: AsyncSession,
 ) -> None:
@@ -286,7 +297,6 @@ async def delete_story(
 
 @_rollback_if_db_exception()
 async def like_story(
-    *,
     story: Story,
     user: User,
     session: AsyncSession,
@@ -304,11 +314,10 @@ async def like_story(
 
 @_rollback_if_db_exception()
 async def update_user(
-    *,
-    bio: str | None = None,
-    avatar_name: str | None = None,
     user: User,
     session: AsyncSession,
+    bio: str | None = None,
+    avatar_name: str | None = None,
 ) -> User:
     user.bio = bio
     user.avatar_name = avatar_name
@@ -319,6 +328,9 @@ async def update_user(
 
 async def get_active_users(
     session: AsyncSession,
+    load_tokens: bool = False,
+    load_stories: bool = False,
+    load_liked_stories: bool = False,
     page: int = 1,
     per_page: int = 20,
 ) -> Sequence[User]:
@@ -330,6 +342,12 @@ async def get_active_users(
         .offset(offset)
         .limit(per_page)
     )
+    if load_tokens:
+        stmt = stmt.options(joinedload(User.tokens))
+    if load_stories:
+        stmt = stmt.options(selectinload(User.stories))
+    if load_liked_stories:
+        stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     users = result.scalars().fetchall()
     return users
@@ -337,6 +355,9 @@ async def get_active_users(
 
 async def get_inactive_users(
     session: AsyncSession,
+    load_tokens: bool = False,
+    load_stories: bool = False,
+    load_liked_stories: bool = False,
     page: int = 1,
     per_page: int = 20,
 ) -> Sequence[User]:
@@ -348,6 +369,12 @@ async def get_inactive_users(
         .offset(offset)
         .limit(per_page)
     )
+    if load_tokens:
+        stmt = stmt.options(joinedload(User.tokens))
+    if load_stories:
+        stmt = stmt.options(selectinload(User.stories))
+    if load_liked_stories:
+        stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     users = result.scalars().fetchall()
     return users
@@ -377,7 +404,6 @@ async def demote_admin(
 
 @_rollback_if_db_exception()
 async def block_user(
-    *,
     user: User,
     session: AsyncSession,
 ) -> User:
@@ -389,7 +415,6 @@ async def block_user(
 
 @_rollback_if_db_exception()
 async def unblock_user(
-    *,
     user: User,
     session: AsyncSession,
 ) -> User:

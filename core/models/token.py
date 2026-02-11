@@ -1,7 +1,7 @@
 import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy import ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models import Base
@@ -14,7 +14,7 @@ class Token(Base):
     __tablename__ = "tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(ForeignKey("users.email"))
+    username: Mapped[str] = mapped_column(ForeignKey("users.username"), unique=True)
     user: Mapped["User"] = relationship(back_populates="tokens")
 
     email_verification_token: Mapped[str | None] = mapped_column(nullable=True)
@@ -27,5 +27,3 @@ class Token(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-
-    __table_args__ = (UniqueConstraint("email"),)

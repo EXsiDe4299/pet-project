@@ -26,7 +26,6 @@ from api.api_v1.utils.database import (
     get_stories_by_name_or_text,
     get_story_by_uuid,
     create_user_with_tokens,
-    get_author_stories,
     create_story,
     edit_story,
     delete_story,
@@ -108,11 +107,9 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
-            email = "test@example.com"
             username = "username"
             mock_user = User(
                 username=username,
-                email=email,
             )
             mock_result = MagicMock(spec=Result)
             mock_result.scalar_one_or_none.return_value = mock_user
@@ -131,9 +128,7 @@ class TestDatabase:
             mock_db_session: AsyncMock,
         ):
             email = "test@example.com"
-            username = "username"
             mock_user = User(
-                username=username,
                 email=email,
             )
             mock_result = MagicMock(spec=Result)
@@ -266,10 +261,10 @@ class TestDatabase:
 
             assert isinstance(added_user, User)
             assert isinstance(added_tokens, Token)
-            assert added_user.email == email
-            assert added_user.hashed_password == hashed_password
             assert added_user.username == username
-            assert added_tokens.email == email
+            assert added_user.hashed_password == hashed_password
+            assert added_user.email == email
+            assert added_tokens.username == username
 
         async def test_with_exception(
             self,
@@ -297,26 +292,29 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
-            user_tokens = Token()
+            user = User(tokens=Token())
             email_verification_token = "new_email_verification_token"
             expire_minutes = 5
 
-            updated_tokens = await update_user_email_verification_token(
-                user_tokens=user_tokens,
+            updated_user = await update_user_email_verification_token(
+                user=user,
                 email_verification_token=email_verification_token,
                 expire_minutes=expire_minutes,
                 session=mock_db_session,
             )
 
-            assert isinstance(updated_tokens, Token)
-            assert updated_tokens.email_verification_token == email_verification_token
+            assert isinstance(updated_user, User)
+            assert (
+                updated_user.tokens.email_verification_token == email_verification_token
+            )
             expected_expiration = datetime.datetime.now(
                 datetime.UTC
             ) + datetime.timedelta(minutes=expire_minutes)
-            assert updated_tokens.email_verification_token_exp is not None
+            assert updated_user.tokens.email_verification_token_exp is not None
             expiration_time_diff = abs(
                 (
-                    updated_tokens.email_verification_token_exp - expected_expiration
+                    updated_user.tokens.email_verification_token_exp
+                    - expected_expiration
                 ).total_seconds()
             )
             assert expiration_time_diff < 10
@@ -327,14 +325,14 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
-            user_tokens = Token()
+            user = User(tokens=Token())
             email_verification_token = "new_email_verification_token"
             expire_minutes = 5
             mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
 
             with pytest.raises(SQLAlchemyError, match="Test error"):
                 await update_user_email_verification_token(
-                    user_tokens=user_tokens,
+                    user=user,
                     email_verification_token=email_verification_token,
                     expire_minutes=expire_minutes,
                     session=mock_db_session,
@@ -349,26 +347,26 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
-            user_tokens = Token()
+            user = User(tokens=Token())
             forgot_password_token = "new_forgot_password_token"
             expire_minutes = 5
 
-            updated_tokens = await update_forgot_password_token(
-                user_tokens=user_tokens,
+            updated_user = await update_forgot_password_token(
+                user=user,
                 forgot_password_token=forgot_password_token,
                 expire_minutes=expire_minutes,
                 session=mock_db_session,
             )
 
-            assert isinstance(updated_tokens, Token)
-            assert updated_tokens.forgot_password_token == forgot_password_token
+            assert isinstance(updated_user, User)
+            assert updated_user.tokens.forgot_password_token == forgot_password_token
             expected_expiration = datetime.datetime.now(
                 datetime.UTC
             ) + datetime.timedelta(minutes=expire_minutes)
-            assert updated_tokens.forgot_password_token_exp is not None
+            assert updated_user.tokens.forgot_password_token_exp is not None
             expiration_time_diff = abs(
                 (
-                    updated_tokens.forgot_password_token_exp - expected_expiration
+                    updated_user.tokens.forgot_password_token_exp - expected_expiration
                 ).total_seconds()
             )
             assert expiration_time_diff < 10
@@ -379,14 +377,14 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
-            user_tokens = Token()
+            user = User(tokens=Token())
             forgot_password_token = "new_forgot_password_token"
             expire_minutes = 5
             mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
 
             with pytest.raises(SQLAlchemyError, match="Test error"):
                 await update_forgot_password_token(
-                    user_tokens=user_tokens,
+                    user=user,
                     forgot_password_token=forgot_password_token,
                     expire_minutes=expire_minutes,
                     session=mock_db_session,
@@ -413,16 +411,16 @@ class TestDatabase:
                 ),
             )
 
-            changed_user = await change_user_password(
+            updated_user = await change_user_password(
                 user=mock_user,
                 new_hashed_password=new_hashed_password,
                 session=mock_db_session,
             )
 
-            assert isinstance(changed_user, User)
-            assert changed_user.hashed_password == new_hashed_password
-            assert changed_user.tokens.forgot_password_token is None
-            assert changed_user.tokens.forgot_password_token_exp is None
+            assert isinstance(updated_user, User)
+            assert updated_user.hashed_password == new_hashed_password
+            assert updated_user.tokens.forgot_password_token is None
+            assert updated_user.tokens.forgot_password_token_exp is None
             mock_db_session.commit.assert_awaited_once()
             mock_db_session.refresh.assert_awaited_once()
             mock_db_session.rollback.assert_not_awaited()
@@ -503,11 +501,13 @@ class TestDatabase:
         ):
             mock_story1 = Story(name="story 1")
             mock_story2 = Story(name="story 2")
+
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = [mock_story1, mock_story2]
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
-                mock_story1,
-                mock_story2,
-            ]
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories(session=mock_db_session)
@@ -521,10 +521,12 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = []
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
-                []
-            )
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories(session=mock_db_session)
@@ -537,10 +539,12 @@ class TestDatabase:
             self,
             mock_db_session: AsyncMock,
         ):
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = []
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
-                []
-            )
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories_by_name_or_text(
@@ -557,11 +561,13 @@ class TestDatabase:
         ):
             mock_story1 = Story(name="story 1 name")
             mock_story2 = Story(name="story 2 name")
+
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = [mock_story1, mock_story2]
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
-                mock_story1,
-                mock_story2,
-            ]
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories_by_name_or_text(
@@ -580,11 +586,13 @@ class TestDatabase:
         ):
             mock_story1 = Story(text="story 1 text")
             mock_story2 = Story(text="story 2 text")
+
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = [mock_story1, mock_story2]
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
-                mock_story1,
-                mock_story2,
-            ]
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories_by_name_or_text(
@@ -604,12 +612,17 @@ class TestDatabase:
             mock_story1 = Story(name="test story 1 name", text="story 1 text")
             mock_story2 = Story(name="story 2 name", text="test story 2 text")
             mock_story3 = Story(name="story 3 name", text="test story 3 text")
-            mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
+
+            mock_scalars_result = MagicMock(spec=Result)
+            mock_scalars_result.fetchall.return_value = [
                 mock_story1,
                 mock_story2,
                 mock_story3,
             ]
+
+            mock_result = MagicMock(spec=Result)
+            mock_result.scalars.return_value = mock_scalars_result
+
             mock_db_session.execute.return_value = mock_result
 
             stories = await get_stories_by_name_or_text(
@@ -633,8 +646,10 @@ class TestDatabase:
         ):
             story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
             mock_story = Story(id=story_id)
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalar_one_or_none.return_value = mock_story
+            mock_result.scalar_one_or_none.return_value = mock_story
+
             mock_db_session.execute.return_value = mock_result
 
             story = await get_story_by_uuid(
@@ -650,8 +665,10 @@ class TestDatabase:
             mock_db_session: AsyncMock,
         ):
             story_id = UUID("59f7c198-c96c-4e32-b09a-665fa84e63fa")
+
             mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalar_one_or_none.return_value = None
+            mock_result.scalar_one_or_none.return_value = None
+
             mock_db_session.execute.return_value = mock_result
 
             story = await get_story_by_uuid(
@@ -660,65 +677,6 @@ class TestDatabase:
             )
             mock_db_session.execute.assert_awaited_once()
             assert story is None
-
-    class TestGetAuthorStories:
-        async def test_success(
-            self,
-            mock_db_session: AsyncMock,
-        ):
-            author_email = "test@example.com"
-            username = "username"
-            author = User(
-                email=author_email,
-                username=username,
-            )
-            mock_story1 = Story(
-                author_email=author_email,
-                author=author,
-            )
-            mock_story2 = Story(
-                author_email=author_email,
-                author=author,
-            )
-            mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = [
-                mock_story1,
-                mock_story2,
-            ]
-            mock_db_session.execute.return_value = mock_result
-
-            stories = await get_author_stories(
-                author_username=username,
-                session=mock_db_session,
-            )
-
-            mock_db_session.execute.assert_awaited_once()
-            assert len(stories) == 2
-            assert stories[0].author_email == author_email
-            assert stories[0].author.email == author_email
-            assert stories[0].author.username == username
-            assert stories[1].author_email == author_email
-            assert stories[1].author.email == author_email
-            assert stories[1].author.username == username
-
-        async def test_empty_result(
-            self,
-            mock_db_session: AsyncMock,
-        ):
-            username = "nonexistent"
-            mock_result = MagicMock(spec=Result)
-            mock_result.unique.return_value.scalars.return_value.fetchall.return_value = (
-                []
-            )
-            mock_db_session.execute.return_value = mock_result
-
-            stories = await get_author_stories(
-                author_username=username,
-                session=mock_db_session,
-            )
-
-            mock_db_session.execute.assert_awaited_once()
-            assert len(stories) == 0
 
     class TestGetActiveUsers:
         async def test_success(
@@ -963,12 +921,12 @@ class TestDatabase:
         ):
             name = "Test story name"
             text = "Test story text"
-            author_email = "test@example.com"
+            author_username = "username"
 
             added_story = await create_story(
                 name=name,
                 text=text,
-                author_email=author_email,
+                author_username=author_username,
                 session=mock_db_session,
             )
 
@@ -979,7 +937,7 @@ class TestDatabase:
             assert isinstance(added_story, Story)
             assert added_story.name == name
             assert added_story.text == text
-            assert added_story.author_email == author_email
+            assert added_story.author_username == author_username
 
         async def test_with_exception(
             self,
@@ -987,14 +945,14 @@ class TestDatabase:
         ):
             name = "Test story name"
             text = "Test story text"
-            author_email = "test@example.com"
+            author_username = "username"
             mock_db_session.commit.side_effect = SQLAlchemyError("Test error")
 
             with pytest.raises(SQLAlchemyError, match="Test error"):
                 await create_story(
                     name=name,
                     text=text,
-                    author_email=author_email,
+                    author_username=author_username,
                     session=mock_db_session,
                 )
 
@@ -1120,7 +1078,7 @@ class TestDatabase:
             mock_db_session.rollback.assert_not_awaited()
             assert mock_story.likes_number == 1
             assert len(mock_story.likers) == 1
-            assert mock_story.likers[0].username == mock_user.username
+            assert mock_story.likers[0].email == mock_user.email
             assert len(mock_user.liked_stories) == 1
             assert mock_user.liked_stories[0].name == story_name
 
@@ -1545,8 +1503,8 @@ class TestJWTAuth:
                 username="username",
             )
             expected_payload = {
-                "sub": user.email,
-                "username": user.username,
+                "sub": user.username,
+                "email": user.email,
             }
             expected_result = "encoded_access_token"
 
@@ -1566,8 +1524,8 @@ class TestJWTAuth:
                 username="username",
             )
             expected_payload = {
-                "sub": user.email,
-                "username": user.username,
+                "sub": user.username,
+                "email": user.email,
             }
 
             with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt:  # fmt: skip
@@ -1586,7 +1544,7 @@ class TestJWTAuth:
                 email="test@example.com",
             )
             expected_payload = {
-                "sub": user.email,
+                "sub": user.username,
             }
             expected_result = "encoded_refresh_token"
 
@@ -1605,7 +1563,7 @@ class TestJWTAuth:
                 email="test@example.com",
             )
             expected_payload = {
-                "sub": user.email,
+                "sub": user.username,
             }
 
             with patch("api.api_v1.utils.jwt_auth.create_jwt", side_effect=jwt.PyJWTError('Test error')) as mock_create_jwt:  # fmt: skip

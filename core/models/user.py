@@ -22,8 +22,8 @@ class Role(str, Enum):
 class User(Base):
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    username: Mapped[str] = mapped_column(String(150), primary_key=True)
+    email: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
     hashed_password: Mapped[bytes] = mapped_column(nullable=False)
     bio: Mapped[str | None] = mapped_column(
         Text(),
@@ -53,13 +53,10 @@ class User(Base):
         server_default=func.now(),
     )
 
-    tokens: Mapped["Token"] = relationship(back_populates="user", lazy="joined")
-    stories: Mapped[list["Story"]] = relationship(
-        back_populates="author", lazy="selectin"
-    )
+    tokens: Mapped["Token"] = relationship(back_populates="user")
+    stories: Mapped[list["Story"]] = relationship(back_populates="author")
 
     liked_stories: Mapped[list["Story"]] = relationship(
         secondary=UserStoryAssociation,
         back_populates="likers",
-        lazy="selectin",
     )

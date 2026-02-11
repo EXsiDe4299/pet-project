@@ -35,13 +35,14 @@ class Story(Base):
         server_default=func.now(),
     )
 
-    author_email: Mapped[str] = mapped_column(ForeignKey("users.email"), nullable=False)
-    author: Mapped["User"] = relationship(back_populates="stories", lazy="joined")
+    author_username: Mapped[str] = mapped_column(
+        ForeignKey("users.username"), nullable=False
+    )
+    author: Mapped["User"] = relationship(back_populates="stories")
 
     likers: Mapped[list["User"]] = relationship(
         secondary=UserStoryAssociation,
         back_populates="liked_stories",
-        lazy="joined",
     )
 
     @validates("likes_number")
