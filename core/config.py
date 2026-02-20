@@ -66,6 +66,8 @@ class LoggingConfig(BaseModel):
         "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
     )
     date_format: str = "%d/%b/%Y %H:%M:%S"
+    api_log_file: Path = Path(__file__).parent.parent / "logs" / "api_access_log.log"
+    app_log_file: Path = Path(__file__).parent.parent / "logs" / "app_log.log"
 
     @property
     def log_level_value(self):
