@@ -1,22 +1,14 @@
-import logging
 import time
 
 import uvicorn
 from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import Response
-
+from api.api_v1.dependencies.log_helper import LogHelper
 from api.main_router import api_router
 from core.config import settings
 
-logging.basicConfig(
-    level=settings.log.log_level_value,
-    format=settings.log.log_format,
-    datefmt=settings.log.date_format,
-)
-
-logger = logging.getLogger(__name__)
-
+logger = LogHelper.get_api_logger()
 
 app = FastAPI()
 
@@ -25,6 +17,9 @@ app.include_router(router=api_router)
 
 @app.middleware("http")
 async def process_time_log_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID")
+    LogHelper.set_request_id(request_id)
+
     start_time = time.time()
     response: Response = await call_next(request)
     process_time = round(time.time() - start_time, 3)
