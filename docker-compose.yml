@@ -27,8 +27,6 @@ services:
   app:
     build:
       dockerfile: Dockerfile
-    ports:
-      - "${APP_CONFIG__RUN__PORT}:${APP_CONFIG__RUN__PORT}"
     env_file:
       - ".env"
     volumes:
