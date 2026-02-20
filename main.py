@@ -15,6 +15,18 @@ app = FastAPI()
 app.include_router(router=api_router)
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "Method=%s Path=%s StatusCode=500 Exception=%r",
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=exc,
+    )
+    raise exc
+
+
 @app.middleware("http")
 async def process_time_log_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID")
