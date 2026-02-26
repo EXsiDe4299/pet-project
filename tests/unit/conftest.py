@@ -1,3 +1,6 @@
+import os
+
+os.environ["TESTING"] = "1"
 import asyncio
 import datetime
 from asyncio import AbstractEventLoop
