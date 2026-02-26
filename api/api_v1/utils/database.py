@@ -228,6 +228,10 @@ async def update_forgot_password_token(
     session: AsyncSession,
     expire_minutes: int = settings.email_tokens.forgot_password_token_exp_minutes,
 ) -> User:
+    logger.debug(
+        "Starting updating forgot password token. %s",
+        user,
+    )
     forgot_password_token_exp = datetime.datetime.now(
         datetime.UTC
     ) + datetime.timedelta(minutes=expire_minutes)
@@ -235,6 +239,10 @@ async def update_forgot_password_token(
     user.tokens.forgot_password_token_exp = forgot_password_token_exp
     await session.commit()
     await session.refresh(user)
+    logger.debug(
+        "Forgot password token updated successfully. %s",
+        user,
+    )
     return user
 
 
