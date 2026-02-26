@@ -16,6 +16,7 @@ from api.api_v1.dependencies.auth import (
 )
 from api.api_v1.dependencies.database.db_helper import db_helper
 from api.api_v1.dependencies.database.redis_helper import redis_helper
+from api.api_v1.dependencies.log_helper import LogHelper
 from api.api_v1.exceptions.http_exceptions import (
     AlreadyRegistered,
     InvalidConfirmEmailCode,
@@ -50,6 +51,7 @@ auth_router = APIRouter(
     prefix=settings.auth_router.prefix,
     tags=settings.auth_router.tags,
 )
+logger = LogHelper.get_app_logger()
 
 
 @auth_router.post(
@@ -79,12 +81,22 @@ async def registration_endpoint(
     ),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    logger.info(
+        "Attempt to register user. Username=%r, Email=%r",
+        username,
+        email,
+    )
     existing_user = await get_user_by_username_or_email(
         username=username,
         email=email,
         session=session,
     )
     if existing_user:
+        logger.warning(
+            "User with Username=%r or Email=%r already exists",
+            username,
+            email,
+        )
         raise AlreadyRegistered()
 
     hashed_password = hash_password(password=password)
@@ -93,6 +105,11 @@ async def registration_endpoint(
         hashed_password=hashed_password,
         email=email,
         session=session,
+    )
+    logger.info(
+        "Registration completed successfully for Username=%r, Email=%r",
+        username,
+        email,
     )
 
     return StatusSuccessResponse()
