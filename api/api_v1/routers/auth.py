@@ -214,16 +214,31 @@ async def forgot_password_endpoint(
     email: EmailStr = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    logger.info(
+        "Attempt to send forgot password token. Email=%r",
+        email,
+    )
     user = await get_user_by_username_or_email(
         email=email,
         session=session,
         load_tokens=True,
     )
+
+    attempt_failed_message = (
+        "Attempt to send forgot password token failed due to invalid email. Email=%r"
+    )
+
     if user is None:
+        logger.warning(attempt_failed_message, email)
         raise InvalidEmail()
     if not user.is_email_verified:
+        logger.warning(attempt_failed_message, email)
         raise InvalidEmail()
     if not user.is_active:
+        logger.warning(
+            "Inactive user. %s",
+            user,
+        )
         raise InactiveUser()
 
     forgot_password_token = generate_email_token()
@@ -238,6 +253,10 @@ async def forgot_password_endpoint(
         email_address=user.email,
         body=updated_user.tokens.forgot_password_token,
         background_tasks=background_tasks,
+    )
+    logger.info(
+        "Background task scheduled for sending forgot password token. %s",
+        user,
     )
 
     return StatusSuccessResponse()
