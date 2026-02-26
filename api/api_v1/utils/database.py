@@ -207,10 +207,18 @@ async def confirm_user_email(
     user: User,
     session: AsyncSession,
 ) -> None:
+    logger.debug(
+        "Starting email confirmation. %s",
+        user,
+    )
     user.is_email_verified = True
     user.tokens.email_verification_token = None
     user.tokens.email_verification_token_exp = None
     await session.commit()
+    logger.debug(
+        "Email confirmed successfully. %s",
+        user,
+    )
 
 
 @_rollback_if_db_exception()
