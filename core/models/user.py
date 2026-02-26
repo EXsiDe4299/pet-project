@@ -66,3 +66,18 @@ class User(Base):
         if role not in Role:
             raise ValueError(f"{role} doesn't exists in Role enum")
         return role
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}("
+            f"username={self.username!r}, "
+            f"email={self.email!r}, "
+            f"role={self.role!r}, "
+            f"is_active={self.is_active}, "
+            f"is_email_verified={self.is_email_verified}, "
+            f"registered_at={self.registered_at}"
+            f")"
+        )
+
+    def __repr__(self):
+        return str(self)
