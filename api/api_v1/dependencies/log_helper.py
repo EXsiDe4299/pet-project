@@ -1,4 +1,5 @@
 import logging
+import os
 from contextvars import ContextVar
 from os import PathLike
 
@@ -40,7 +41,12 @@ class LogHelper:
             fmt=settings.log.log_format,
             datefmt=settings.log.date_format,
         )
-        handler = logging.FileHandler(filename)
+
+        handler = (
+            logging.StreamHandler()
+            if os.environ.get("TESTING", "")
+            else logging.FileHandler(filename)
+        )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
