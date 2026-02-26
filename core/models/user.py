@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String, Text, func, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import expression
 
 from core.models.base import Base
@@ -60,3 +60,9 @@ class User(Base):
         secondary=UserStoryAssociation,
         back_populates="likers",
     )
+
+    @validates("role")
+    def validate_role(self, key, role):
+        if role not in Role:
+            raise ValueError(f"{role} doesn't exists in Role enum")
+        return role
