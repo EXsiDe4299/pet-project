@@ -167,24 +167,38 @@ async def confirm_email_endpoint(
     email_verification_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    logger.info("Attempt to confirm email")
     email_verification_token = email_verification_token.lower().strip()
     user = await get_user_by_email_verification_token(
         email_verification_token=email_verification_token,
         session=session,
         load_tokens=True,
     )
+
+    attempt_failed_message = "Attempt to confirm email failed due to invalid token"
+
     if user is None:
+        logger.warning(attempt_failed_message)
         raise InvalidConfirmEmailCode()
     if user.is_email_verified:
+        logger.warning(
+            "Email already verified. %s",
+            user,
+        )
         raise EmailAlreadyVerified()
 
     token_exp = user.tokens.email_verification_token_exp
     if token_exp is None or token_exp < datetime.datetime.now(datetime.UTC):
+        logger.warning(attempt_failed_message)
         raise InvalidConfirmEmailCode()
 
     await confirm_user_email(
         user=user,
         session=session,
+    )
+    logger.info(
+        "Email verified successfully. %s",
+        user,
     )
 
     return StatusSuccessResponse()
