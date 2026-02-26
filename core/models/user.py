@@ -40,7 +40,7 @@ class User(Base):
         default=False,
         server_default=expression.false(),
     )
-    role: Mapped[Role] = mapped_column(
+    role: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
         default=Role.USER,
