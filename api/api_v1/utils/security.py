@@ -4,16 +4,22 @@ from pathlib import Path
 
 import bcrypt
 from PIL import Image
+
+from api.api_v1.dependencies.log_helper import LogHelper
 from api.api_v1.exceptions.http_exceptions import InvalidAvatarFormat
 from fastapi import UploadFile
 
 from core.config import settings
 
+logger = LogHelper.get_app_logger()
+
 
 def hash_password(password: str) -> bytes:
+    logger.debug("Starting password hashing")
     salt = bcrypt.gensalt()
     password_bytes = password.encode()
     hashed_password = bcrypt.hashpw(password_bytes, salt)
+    logger.debug("Password hashed successfully")
     return hashed_password
 
 
