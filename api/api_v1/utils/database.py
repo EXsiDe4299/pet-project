@@ -67,6 +67,14 @@ async def get_user_by_username_or_email(
     load_stories: bool = False,
     load_liked_stories: bool = False,
 ) -> User | None:
+    logger.debug(
+        "Searching for user by username=%r or email=%r. Loading relations: Tokens=%s, Stories=%s, Liked Stories=%s",
+        username,
+        email,
+        load_tokens,
+        load_stories,
+        load_liked_stories,
+    )
     stmt = select(User).where(or_(User.username == username, User.email == email))
     if load_tokens:
         stmt = stmt.options(joinedload(User.tokens))
@@ -76,6 +84,14 @@ async def get_user_by_username_or_email(
         stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
+    if user:
+        logger.debug("Found user. %s", user)
+    else:
+        logger.debug(
+            "User with username=%r or email=%r not found",
+            username,
+            email,
+        )
     return user
 
 
