@@ -148,6 +148,11 @@ async def create_user_with_tokens(
     email: str | EmailStr,
     session: AsyncSession,
 ) -> None:
+    logger.debug(
+        "Creating new user and token records. Username=%r, Email=%r",
+        username,
+        email,
+    )
     new_user = User(
         email=email,
         username=username,
@@ -157,6 +162,7 @@ async def create_user_with_tokens(
     session.add(new_user)
     session.add(tokens)
     await session.commit()
+    logger.debug("User created successfully. %s", new_user)
 
 
 @_rollback_if_db_exception()
