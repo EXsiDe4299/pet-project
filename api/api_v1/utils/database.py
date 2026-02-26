@@ -10,9 +10,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from api.api_v1.dependencies.log_helper import LogHelper
 from core.config import settings
 from core.models import User, Token, Story
 from core.models.user import Role
+
+logger = LogHelper.get_app_logger()
 
 
 def _rollback_if_db_exception(session_param_name: str = "session"):
@@ -42,8 +45,13 @@ def _rollback_if_db_exception(session_param_name: str = "session"):
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except SQLAlchemyError:
+            except SQLAlchemyError as exc:
                 await session.rollback()
+                logger.error(
+                    "SQLAlchemyError occurred in %s. Rollback has been applied. Error: %r",
+                    func.__name__,
+                    exc,
+                )
                 raise
 
         return wrapper
