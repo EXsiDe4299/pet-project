@@ -125,7 +125,15 @@ async def send_email_verification_token_endpoint(
     user: User = Depends(get_user_from_form_with_tokens),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    logger.info(
+        "Attempt to send email verification token. %s",
+        user,
+    )
     if user.is_email_verified:
+        logger.warning(
+            "Email already verified. %s",
+            user,
+        )
         raise EmailAlreadyVerified()
 
     email_verification_token = generate_email_token()
@@ -142,6 +150,11 @@ async def send_email_verification_token_endpoint(
         body=updated_user.tokens.email_verification_token,
         background_tasks=background_tasks,
     )
+    logger.info(
+        "Background task scheduled for sending email verification token. %s",
+        user,
+    )
+
     return StatusSuccessResponse()
 
 
