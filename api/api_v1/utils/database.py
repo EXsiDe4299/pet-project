@@ -102,6 +102,12 @@ async def get_user_by_email_verification_token(
     load_stories: bool = False,
     load_liked_stories: bool = False,
 ) -> User | None:
+    logger.debug(
+        "Searching for user by email verification token. Loading relations: Tokens=%s, Stories=%s, Liked Stories=%s",
+        load_tokens,
+        load_stories,
+        load_liked_stories,
+    )
     stmt = (
         select(User)
         .join(User.tokens)
@@ -115,6 +121,10 @@ async def get_user_by_email_verification_token(
         stmt = stmt.options(selectinload(User.liked_stories))
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
+    if user:
+        logger.debug("Found user. %s", user)
+    else:
+        logger.debug("User not found")
     return user
 
 
