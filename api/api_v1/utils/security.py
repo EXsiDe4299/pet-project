@@ -34,7 +34,9 @@ def validate_token_type(token_payload: dict, expected_type: str) -> bool:
 
 
 def generate_email_token(length: int = settings.email_tokens.token_length) -> str:
+    logger.debug("Starting generating email token")
     email_verification_token = "".join(secrets.choice(settings.email_tokens.token_symbols) for _ in range(length)) # fmt: skip
+    logger.debug("Email token generated successfully")
     return email_verification_token
 
 
