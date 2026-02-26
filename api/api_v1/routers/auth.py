@@ -249,7 +249,14 @@ async def forgot_password_endpoint(
     response_model=StatusSuccessResponse,
 )
 async def change_password_endpoint(
-    new_password: str = Form(min_length=3, max_length=100, default=""),
+    new_password: str = Form(
+        default="",
+        min_length=8,
+        max_length=150,
+        pattern=re.compile(
+            "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
+        ),  # pyright: ignore
+    ),
     forgot_password_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
