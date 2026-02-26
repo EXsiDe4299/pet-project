@@ -73,7 +73,7 @@ async def registration_endpoint(
     ),
     password: str = Form(
         default="",
-        min_length=6,
+        min_length=8,
         max_length=150,
         pattern=re.compile(
             "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$"
