@@ -3,8 +3,11 @@ import uuid
 
 import jwt
 
+from api.api_v1.dependencies.log_helper import LogHelper
 from core.config import settings
 from core.models import User
+
+logger = LogHelper.get_app_logger()
 
 
 def encode_jwt(
@@ -68,15 +71,20 @@ def create_jwt(
 
 
 def create_access_token(user: User):
+    logger.debug("Creating access token. %s", user)
+
     access_token_payload = {
         "sub": user.username,
         "email": user.email,
     }
-    return create_jwt(
+    access_token = create_jwt(
         token_type=settings.jwt_auth.access_token_type,
         token_data=access_token_payload,
         expire_minutes=settings.jwt_auth.access_token_expire_minutes,
     )
+    logger.debug("Access token created successfully. %s", user)
+
+    return access_token
 
 
 def create_refresh_token(user: User):
