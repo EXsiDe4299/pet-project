@@ -383,6 +383,10 @@ async def refresh_jwt_endpoint(
     response: Response,
     user: User = Depends(get_user_from_refresh_token),
 ):
+    logger.info(
+        "Attempt to refresh JWT. %s",
+        user,
+    )
     new_access_token = create_access_token(user)
     new_refresh_token = create_refresh_token(user)
 
@@ -396,6 +400,10 @@ async def refresh_jwt_endpoint(
         secure=settings.cookie.secure,
         httponly=settings.cookie.httponly,
         samesite=settings.cookie.samesite,
+    )
+    logger.info(
+        "JWT refreshed successfully. %s",
+        user,
     )
 
     return RefreshResponse(
