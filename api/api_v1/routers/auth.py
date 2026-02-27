@@ -279,6 +279,7 @@ async def change_password_endpoint(
     forgot_password_token: str = Form(default=""),
     session: AsyncSession = Depends(db_helper.get_session),
 ):
+    logger.info("Attempt to change password")
     forgot_password_token = forgot_password_token.lower().strip()
     user = await get_user_by_forgot_password_token(
         forgot_password_token=forgot_password_token,
@@ -286,14 +287,26 @@ async def change_password_endpoint(
         load_tokens=True,
     )
     if user is None:
+        logger.warning(
+            "Attempt to change password failed. User not found for provided token"
+        )
         raise InvalidChangePasswordCode()
     if not user.is_email_verified:
+        logger.warning(
+            "Attempt to change password failed. Email is not verified. %s",
+            user,
+        )
         raise InvalidEmail()
     if not user.is_active:
+        logger.warning(
+            "Attempt to change password failed. User is inactive. %s",
+            user,
+        )
         raise InactiveUser()
 
     token_exp = user.tokens.forgot_password_token_exp
     if token_exp is None or token_exp < datetime.datetime.now(datetime.UTC):
+        logger.warning("Attempt to change password failed. Token expired or invalid")
         raise InvalidChangePasswordCode()
 
     new_hashed_password = hash_password(password=new_password)
@@ -301,6 +314,10 @@ async def change_password_endpoint(
         user=user,
         new_hashed_password=new_hashed_password,
         session=session,
+    )
+    logger.info(
+        "Password changed successfully. %s",
+        user,
     )
     return StatusSuccessResponse()
 
