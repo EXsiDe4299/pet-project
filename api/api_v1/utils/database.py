@@ -262,11 +262,19 @@ async def change_user_password(
     new_hashed_password: bytes,
     session: AsyncSession,
 ) -> User:
+    logger.debug(
+        "Starting changing password. %s",
+        user,
+    )
     user.hashed_password = new_hashed_password
     user.tokens.forgot_password_token = None
     user.tokens.forgot_password_token_exp = None
     await session.commit()
     await session.refresh(user)
+    logger.debug(
+        "Password changed successfully. %s",
+        user,
+    )
     return user
 
 
