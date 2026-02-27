@@ -88,11 +88,16 @@ def create_access_token(user: User):
 
 
 def create_refresh_token(user: User):
+    logger.debug("Creating refresh token. %s", user)
+
     refresh_token_payload = {
         "sub": user.username,
     }
-    return create_jwt(
+    refresh_token = create_jwt(
         token_type=settings.jwt_auth.refresh_token_type,
         token_data=refresh_token_payload,
         expire_minutes=settings.jwt_auth.refresh_token_expire_minutes,
     )
+    logger.debug("Refresh token created successfully. %s", user)
+
+    return refresh_token
