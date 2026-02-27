@@ -93,7 +93,7 @@ async def registration_endpoint(
     )
     if existing_user:
         logger.warning(
-            "User with Username=%r or Email=%r already exists",
+            "Attempt to register user failed. User already exists. Username=%r, Email=%r",
             username,
             email,
         )
@@ -107,7 +107,7 @@ async def registration_endpoint(
         session=session,
     )
     logger.info(
-        "Registration completed successfully for Username=%r, Email=%r",
+        "Registration completed successfully. Username=%r, Email=%r",
         username,
         email,
     )
@@ -131,7 +131,7 @@ async def send_email_verification_token_endpoint(
     )
     if user.is_email_verified:
         logger.warning(
-            "Email already verified. %s",
+            "Attempt to send email verification token failed. Email already verified. %s",
             user,
         )
         raise EmailAlreadyVerified()
@@ -174,22 +174,21 @@ async def confirm_email_endpoint(
         session=session,
         load_tokens=True,
     )
-
-    attempt_failed_message = "Attempt to confirm email failed due to invalid token"
-
     if user is None:
-        logger.warning(attempt_failed_message)
+        logger.warning(
+            "Attempt to confirm email failed. User not found for provided token"
+        )
         raise InvalidConfirmEmailCode()
     if user.is_email_verified:
         logger.warning(
-            "Email already verified. %s",
+            "Attempt to confirm email failed. Email already verified. %s",
             user,
         )
         raise EmailAlreadyVerified()
 
     token_exp = user.tokens.email_verification_token_exp
     if token_exp is None or token_exp < datetime.datetime.now(datetime.UTC):
-        logger.warning(attempt_failed_message)
+        logger.warning("Attempt to confirm email failed. Token expired or invalid")
         raise InvalidConfirmEmailCode()
 
     await confirm_user_email(
@@ -223,20 +222,21 @@ async def forgot_password_endpoint(
         session=session,
         load_tokens=True,
     )
-
-    attempt_failed_message = (
-        "Attempt to send forgot password token failed due to invalid email. Email=%r"
-    )
-
     if user is None:
-        logger.warning(attempt_failed_message, email)
+        logger.warning(
+            "Attempt to send forgot password token failed. User not found. Email=%r",
+            email,
+        )
         raise InvalidEmail()
     if not user.is_email_verified:
-        logger.warning(attempt_failed_message, email)
+        logger.warning(
+            "Attempt to send forgot password token failed. Email is not verified. %s",
+            user,
+        )
         raise InvalidEmail()
     if not user.is_active:
         logger.warning(
-            "Inactive user. %s",
+            "Attempt to send forgot password token failed. User is inactive. %s",
             user,
         )
         raise InactiveUser()

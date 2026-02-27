@@ -193,9 +193,8 @@ async def update_user_email_verification_token(
     expire_minutes: int = settings.email_tokens.email_verification_token_exp_minutes,
 ) -> User:
     logger.debug(
-        "Updating user's email verification token. Username=%r, Email=%r",
-        user.username,
-        user.email,
+        "Updating user's email verification token. %s",
+        user,
     )
     email_verification_token_exp = datetime.datetime.now(
         datetime.UTC
@@ -205,9 +204,8 @@ async def update_user_email_verification_token(
     await session.commit()
     await session.refresh(user)
     logger.debug(
-        "User's email verification token updated successfully. Username=%r, Email=%r",
-        user.username,
-        user.email,
+        "User's email verification token updated successfully. %s",
+        user,
     )
     return user
 
