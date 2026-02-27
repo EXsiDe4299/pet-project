@@ -331,10 +331,22 @@ async def login_endpoint(
     response: Response,
     user: User = Depends(get_user_from_form),
 ):
+    logger.info(
+        "Attempt to login. %s",
+        user,
+    )
     if not user.is_active:
+        logger.warning(
+            "Attempt to login failed. User is inactive. %s",
+            user,
+        )
         raise InactiveUser()
 
     if not user.is_email_verified:
+        logger.warning(
+            "Attempt to login failed. Email is not verified. %s",
+            user,
+        )
         raise InvalidEmail()
 
     access_token = create_access_token(user=user)
@@ -350,6 +362,10 @@ async def login_endpoint(
         secure=settings.cookie.secure,
         httponly=settings.cookie.httponly,
         samesite=settings.cookie.samesite,
+    )
+    logger.info(
+        "Successful login. %s",
+        user,
     )
 
     return LoginResponse(
