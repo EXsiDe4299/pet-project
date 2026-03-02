@@ -422,6 +422,17 @@ async def logout_endpoint(
     access_token_payload: dict = Depends(get_payload_from_access_token),
     cache: Redis = Depends(redis_helper.get_redis),
 ):
+    sub = access_token_payload.get("sub", "")
+    logger.info(
+        "Attempt to logout. JWT sub=%r",
+        sub,
+    )
+
     await add_token_to_blacklist(payload=access_token_payload, cache=cache)
     response.delete_cookie(settings.cookie.refresh_token_key)
+    logger.info(
+        "Successful logout. JWT sub=%r",
+        sub,
+    )
+
     return StatusSuccessResponse()
