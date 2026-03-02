@@ -66,19 +66,13 @@ new endpoints, refine the code structure, and add more functionality.
 - **Testing** – Pytest
 - **Containerization** – Docker + Docker compose
 - **Reverse proxy** – Nginx
+- **CI** – pre-commit + GitHub Actions
 
 ## Running tests
 
 1. **Create and activate virtual environment:**
-    
-    - Linux:
     ```bash
-    uv venv && source .venv/bin/activate
-    ```
-   
-    - Windows:
-    ```bash
-    uv venv && .venv\scripts\activate
+    uv venv
     ```
 
 2. **Install requirements:**

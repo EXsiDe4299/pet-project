@@ -66,19 +66,13 @@
 - **Тестирование** – Pytest
 - **Контейнеризация** – Docker + Docker compose
 - **Обратный прокси** – Nginx
+- **CI** – pre-commit + GitHub Actions
 
 ## Запуск тестов
 
 1. **Создайте и активируйте виртуальное окружение:**
-
-    - Linux:
     ```bash
-    uv venv && source .venv/bin/activate
-    ```
-    
-    - Windows:
-    ```bash
-    uv venv && .venv\scripts\activate
+    uv venv
     ```
     
 2. **Установите зависимости:**
